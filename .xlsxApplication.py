@@ -1,458 +1,335 @@
 import sys
+from typing import List
+
 import pandas as pd
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QFileDialog, QStackedWidget, QTableWidget,
-    QTableWidgetItem, QMessageBox, QHeaderView, QFrame
+    QApplication,
+    QFileDialog,
+    QFrame,
+    QHeaderView,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QStackedWidget,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+    QMainWindow,
 )
-from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtGui import QIcon, QFont
+
 
 class ExcelProcessorApp(QMainWindow):
+    """Minimal invasive rewrite of the original widget‑based Excel helper.
+
+    ‑ Keeps the overall flow (file‑select page → table page → save) intact
+    ‑ Removes style‑sheet properties unsupported by Qt (e.g., box‑shadow)
+    ‑ Fixes crash reason: duplicate *cellChanged* connections & recursive signals
+    ‑ Implements K‑column multiplication + L‑column stock check with “#SİPARİŞ VER”.
+    """
+
+    # --- Constants ------------------------------------------------------- #
+    SHEET1_COLS = {"A": 0, "C": 2, "G": 6, "E": 4}
+    SHEET2_COLS = {"B": 1, "J": 9}
+    SHEET3_COLS = {"B": 1, "J": 9, "K": 10}
+    COMMON_MATCH_COL = {"G": 6}
+
+    HEADER_LABELS = [
+        "A", "B", "C", "D",  # Sheet‑1
+        "E", "F",              # Sheet‑2
+        "H", "I", "J",         # Sheet‑3
+        "K", "L",              # New columns
+    ]
+
+    # --- Init / UI ------------------------------------------------------- #
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Excel Veri Yönetimi Uygulaması")
         self.setGeometry(100, 100, 1200, 800)
-        self.setWindowIcon(QIcon("icon.png")) # Uygulama ikonu (isteğe bağlı, kendi ikonunuzu ekleyin)
+        self.setWindowIcon(QIcon("icon.png"))  # put your icon next to script
 
-        # Ana stil ayarları
-        self.setStyleSheet("""
-            QMainWindow {
-                background-color: #f0f2f5;
-            }
-            QWidget {
-                font-family: 'Segoe UI', sans-serif;
-                font-size: 14px;
-            }
-            QLabel#titleLabel {
-                font-size: 28px;
-                font-weight: bold;
-                color: #2c3e50;
-                margin-bottom: 20px;
-            }
-            QPushButton {
-                background-color: #3498db;
-                color: white;
-                border-radius: 8px;
-                padding: 12px 25px;
-                font-size: 15px;
-                font-weight: bold;
-                border: none;
-            }
-            QPushButton:hover {
-                background-color: #2980b9;
-            }
-            QPushButton:disabled {
-                background-color: #cccccc;
-                color: #666666;
-            }
-            QFrame#cardFrame {
-                background-color: white;
-                border-radius: 10px;
-                padding: 30px;
-                box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.1);
-            }
-            QTableWidget {
-                background-color: white;
-                border: 1px solid #dcdcdc;
-                gridline-color: #f0f0f0;
-                selection-background-color: #aed6f1;
-                selection-color: black;
-                font-size: 13px;
-            }
-            QHeaderView::section {
-                background-color: #e9ecef;
-                color: #495057;
-                padding: 8px;
-                border: 1px solid #dcdcdc;
-                font-weight: bold;
-            }
-            QLabel#filePathLabel {
-                font-style: italic;
-                color: #555;
-                font-size: 13px;
-                margin-top: 10px;
-            }
-        """)
+        self._updating = False  # recursion‑guard for cellChanged
+        self._cell_connected = False  # track signal connection
 
-        self.stacked_widget = QStackedWidget()
+        self.excel_data = {}
+        self.selected_file_path = ""
+        self.sheet_names: List[str] = []
+
+        self._build_style()
+        self._build_pages()
+
+    # -------------------------------------------------------------------- #
+    #                           UI Construction
+    # -------------------------------------------------------------------- #
+    def _build_style(self):
+        self.setStyleSheet(
+            """
+            QMainWindow { background: #f0f2f5; }
+            QWidget     { font-family: 'Segoe UI', sans-serif; font-size: 14px; }
+            QLabel#titleLabel { font-size: 28px; font-weight: bold; color: #2c3e50; margin-bottom: 20px; }
+            QPushButton { background: #3498db; color: white; border-radius: 8px; padding: 12px 25px; font-size: 15px; font-weight: bold; border: none; }
+            QPushButton:hover    { background: #2980b9; }
+            QPushButton:disabled { background: #cccccc; color: #666666; }
+            QFrame#card { background: white; border-radius: 10px; padding: 30px; }
+            QTableWidget         { background: white; border: 1px solid #dcdcdc; gridline-color: #f0f0f0; selection-background-color: #aed6f1; font-size: 13px; }
+            QHeaderView::section { background: #e9ecef; color: #495057; padding: 8px; border: 1px solid #dcdcdc; font-weight: bold; }
+            QLabel#filePathLabel { font-style: italic; color: #555; font-size: 13px; margin-top: 10px; }
+            """
+        )
+
+    def _build_pages(self):
+        self.stacked_widget = QStackedWidget(self)
         self.setCentralWidget(self.stacked_widget)
 
-        self.setup_ui()
+        # 1) File‑select page ------------------------------------------------
+        self.file_page = QWidget()
+        main_v = QVBoxLayout(self.file_page)
 
-        self.excel_data = {} # Tüm excel verisini tutacak (DataFrame'ler)
-        self.selected_file_path = None
-        self.sheet_names = [] # Sayfa isimlerini tutacak
+        card = QFrame(objectName="card")
+        card.setFixedSize(500, 350)
+        card_v = QVBoxLayout(card)
 
-        # Sütun indeksleri tanımlamaları (Excel'deki 0-tabanlı indekslere göre)
-        self.sheet1_cols_map = {
-            'A': 0,
-            'C': 2, # Eşleştirme için kullanılacak C indeksi
-            'G': 6,
-            'E': 4
-        }
-        # Sheet 2'den alınacak indeksler: B, J (K hariç)
-        # Sheet 3'ten alınacak indeksler: B, J, K
-        self.sheet2_specific_cols_map = {
-            'B': 1,
-            'J': 9,
-        }
-        self.sheet3_specific_cols_map = {
-            'B': 1,
-            'J': 9,
-            'K': 10
-        }
-        # Ortak eşleşme indeksi
-        self.common_match_col_map = {
-            'G': 6 # Eşleştirme için 2. ve 3. sayfalardaki G indeksi
-        }
+        ttl = QLabel("Excel Dosyası Seçin", objectName="titleLabel", alignment=Qt.AlignCenter)
+        card_v.addWidget(ttl)
+        card_v.addSpacing(30)
 
-        # Eşleşme için kullanılacak sütunların indeksleri
-        self.matching_col_sheet1_idx = self.sheet1_cols_map['C'] # 1. sayfadaki eşleşme indeksi (C)
-        self.matching_col_sheet23_idx = self.common_match_col_map['G'] # 2. ve 3. sayfalardaki eşleşme indeksi (G)
+        self.btn_select = QPushButton("Dosya Seç", clicked=self._select_file)
+        card_v.addWidget(self.btn_select)
 
-    def setup_ui(self):
-        # --- Dosya Seç Sayfası ---
-        self.file_selection_page = QWidget()
-        main_layout_fs = QVBoxLayout()
-        self.file_selection_page.setLayout(main_layout_fs)
+        self.lbl_file = QLabel("Seçilen Dosya: Yüklenmedi", objectName="filePathLabel", alignment=Qt.AlignCenter)
+        card_v.addWidget(self.lbl_file)
+        card_v.addSpacing(20)
 
-        card_frame_fs = QFrame()
-        card_frame_fs.setObjectName("cardFrame")
-        card_layout_fs = QVBoxLayout()
-        card_frame_fs.setLayout(card_layout_fs)
-        card_frame_fs.setFixedWidth(500)
-        card_frame_fs.setFixedHeight(350)
+        self.btn_open = QPushButton("Uyarlanmış Dosyayı Görüntüle", enabled=False, clicked=self._open_table_page)
+        card_v.addWidget(self.btn_open)
 
-        title_label_fs = QLabel("Excel Dosyası Seçin")
-        title_label_fs.setObjectName("titleLabel")
-        title_label_fs.setAlignment(Qt.AlignCenter)
-        card_layout_fs.addWidget(title_label_fs)
+        main_v.addStretch(1)
+        main_v.addWidget(card, alignment=Qt.AlignCenter)
+        main_v.addStretch(1)
 
-        card_layout_fs.addSpacing(30)
+        self.stacked_widget.addWidget(self.file_page)
 
-        self.select_file_button = QPushButton("Dosya Seç")
-        self.select_file_button.clicked.connect(self.select_excel_file)
-        card_layout_fs.addWidget(self.select_file_button)
+        # 2) Table page -----------------------------------------------------
+        self.table_page = QWidget()
+        tv = QVBoxLayout(self.table_page)
 
-        self.selected_file_label = QLabel("Seçilen Dosya: Yüklenmedi")
-        self.selected_file_label.setObjectName("filePathLabel")
-        self.selected_file_label.setAlignment(Qt.AlignCenter)
-        card_layout_fs.addWidget(self.selected_file_label)
+        lbl2 = QLabel("Uyarlanmış Excel Verileri", objectName="titleLabel", alignment=Qt.AlignCenter)
+        tv.addWidget(lbl2)
+        tv.addSpacing(15)
 
-        card_layout_fs.addSpacing(20)
+        self.table = QTableWidget(editTriggers=QTableWidget.DoubleClicked | QTableWidget.AnyKeyPressed, alternatingRowColors=True)
+        tv.addWidget(self.table)
 
-        self.go_to_custom_button = QPushButton("Uyarlanmış Dosyayı Görüntüle")
-        self.go_to_custom_button.setEnabled(False)
-        self.go_to_custom_button.clicked.connect(self.go_to_custom_file_page)
-        card_layout_fs.addWidget(self.go_to_custom_button)
+        hbox = QHBoxLayout()
+        self.btn_save = QPushButton("Değişiklikleri Kaydet", clicked=self._save_excel)
+        self.btn_back = QPushButton("Geri Dön", clicked=lambda: self.stacked_widget.setCurrentWidget(self.file_page))
+        hbox.addStretch(1)
+        hbox.addWidget(self.btn_save)
+        hbox.addWidget(self.btn_back)
+        hbox.addStretch(1)
+        tv.addLayout(hbox)
+        tv.addSpacing(20)
 
-        main_layout_fs.addStretch()
-        main_layout_fs.addWidget(card_frame_fs, alignment=Qt.AlignCenter)
-        main_layout_fs.addStretch()
+        self.stacked_widget.addWidget(self.table_page)
 
-        self.stacked_widget.addWidget(self.file_selection_page)
-
-        # --- Uyarlanmış Dosya Sayfası ---
-        self.custom_file_page = QWidget()
-        custom_file_layout = QVBoxLayout()
-        self.custom_file_page.setLayout(custom_file_layout)
-
-        custom_title_label = QLabel("Uyarlanmış Excel Verileri")
-        custom_title_label.setObjectName("titleLabel")
-        custom_title_label.setAlignment(Qt.AlignCenter)
-        custom_file_layout.addWidget(custom_title_label)
-
-        custom_file_layout.addSpacing(15)
-
-        self.table_widget = QTableWidget()
-        self.table_widget.setEditTriggers(QTableWidget.DoubleClicked | QTableWidget.AnyKeyPressed)
-        self.table_widget.setAlternatingRowColors(True)
-        custom_file_layout.addWidget(self.table_widget)
-
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
-
-        self.save_button = QPushButton("Değişiklikleri Kaydet")
-        self.save_button.clicked.connect(self.save_custom_excel)
-        button_layout.addWidget(self.save_button)
-
-        self.back_button = QPushButton("Geri Dön")
-        self.back_button.clicked.connect(lambda: self.stacked_widget.setCurrentWidget(self.file_selection_page))
-        button_layout.addWidget(self.back_button)
-        button_layout.addStretch()
-
-        custom_file_layout.addLayout(button_layout)
-        custom_file_layout.addSpacing(20)
-
-        self.stacked_widget.addWidget(self.custom_file_page)
-
-    def select_excel_file(self):
-        options = QFileDialog.Options()
-        file_path, _ = QFileDialog.getOpenFileName(self,
-                                                   "Excel Dosyası Seç",
-                                                   "",
-                                                   "Excel Dosyaları (*.xlsx)",
-                                                   options=options)
-        if file_path:
-            self.selected_file_path = file_path
-            self.selected_file_label.setText(f"Seçilen Dosya: {file_path.split('/')[-1]}")
-            self.go_to_custom_button.setEnabled(False)
-            self.load_excel_data()
-        else:
-            self.selected_file_path = None
-            self.selected_file_label.setText("Seçilen Dosya: Yüklenmedi")
-            self.go_to_custom_button.setEnabled(False)
-
-    def load_excel_data(self):
-        if not self.selected_file_path:
-            QMessageBox.warning(self, "Hata", "Lütfen önce bir Excel dosyası seçin.")
+    # -------------------------------------------------------------------- #
+    #                           File selection
+    # -------------------------------------------------------------------- #
+    def _select_file(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Excel Dosyası Seç", "", "Excel Dosyaları (*.xlsx)")
+        if not path:
             return
+        self.selected_file_path = path
+        self.lbl_file.setText(f"Seçilen Dosya: {path.split('/')[-1]}")
+        self._load_excel()
 
+    def _load_excel(self):
         try:
             xls = pd.ExcelFile(self.selected_file_path)
             self.sheet_names = xls.sheet_names
-
             if len(self.sheet_names) < 3:
-                QMessageBox.critical(self, "Hata", "Seçilen Excel dosyasında en az 3 sayfa bulunmalıdır.")
-                self.go_to_custom_button.setEnabled(False)
-                return
-
-            self.excel_data['Sheet1_Indexed'] = pd.read_excel(xls, sheet_name=self.sheet_names[0], header=None)
-            self.excel_data['Sheet2_Indexed'] = pd.read_excel(xls, sheet_name=self.sheet_names[1], header=None)
-            self.excel_data['Sheet3_Indexed'] = pd.read_excel(xls, sheet_name=self.sheet_names[2], header=None)
-
-            QMessageBox.information(self, "Başarılı", "Excel dosyası başarıyla yüklendi.")
-            self.go_to_custom_button.setEnabled(True)
-
-        except FileNotFoundError:
-            QMessageBox.critical(self, "Hata", "Dosya bulunamadı.")
-            self.go_to_custom_button.setEnabled(False)
+                raise ValueError("Seçilen Excel dosyasında en az 3 sayfa bulunmalıdır.")
+            self.excel_data = {
+                "s1": pd.read_excel(xls, sheet_name=self.sheet_names[0], header=None),
+                "s2": pd.read_excel(xls, sheet_name=self.sheet_names[1], header=None),
+                "s3": pd.read_excel(xls, sheet_name=self.sheet_names[2], header=None),
+            }
         except Exception as e:
-            QMessageBox.critical(self, "Hata", f"Excel dosyası yüklenirken bir hata oluştu: {e}")
-            self.go_to_custom_button.setEnabled(False)
-
-    def go_to_custom_file_page(self):
-        if not all(k in self.excel_data for k in ['Sheet1_Indexed', 'Sheet2_Indexed', 'Sheet3_Indexed']):
-            QMessageBox.warning(self, "Uyarı", "Excel verileri tam olarak yüklenemedi. Lütfen tekrar deneyin.")
+            QMessageBox.critical(self, "Hata", f"Excel dosyası yüklenirken bir hata oluştu:\n{e}")
+            self.btn_open.setEnabled(False)
             return
 
-        self.populate_custom_table()
-        self.stacked_widget.setCurrentWidget(self.custom_file_page)
+        QMessageBox.information(self, "Başarılı", "Excel dosyası başarıyla yüklendi.")
+        self.btn_open.setEnabled(True)
 
-    def populate_custom_table(self):
-        sheet1_df_original = self.excel_data.get('Sheet1_Indexed')
-        sheet2_df = self.excel_data.get('Sheet2_Indexed')
-        sheet3_df = self.excel_data.get('Sheet3_Indexed')
-
-        # Yeni gereksinim: Sadece 1. sayfada hem 2. (C) hem de 0. (A) indekslerde değeri olan satırları filtrele
-        sheet1_df = sheet1_df_original[
-            sheet1_df_original[self.sheet1_cols_map['C']].notna() &
-            sheet1_df_original[self.sheet1_cols_map['A']].notna()
-        ].copy() # Filtreleme sonrası kopya oluşturarak SettingWithCopyWarning'i önle
-
-        sheet1_df.drop_duplicates(
-            subset=self.sheet1_cols_map['C'],  # C sütunu
-            keep='first',
-            inplace=True
-        )
-        # Sütun indeksleri listesi
-        sheet1_display_indices = [
-            self.sheet1_cols_map['A'],
-            self.sheet1_cols_map['C'],
-            self.sheet1_cols_map['G'],
-            self.sheet1_cols_map['E']
-        ]
-        sheet2_display_indices = [
-            self.sheet2_specific_cols_map['B'],
-            self.sheet2_specific_cols_map['J']
-        ]
-        sheet3_display_indices = [
-            self.sheet3_specific_cols_map['B'],
-            self.sheet3_specific_cols_map['J'],
-            self.sheet3_specific_cols_map['K']
-        ]
-
-        # Sütun indekslerinin varlığını kontrol et
-        max_col_sheet1 = sheet1_df_original.shape[1] - 1 if not sheet1_df_original.empty else -1
-        max_col_sheet2 = sheet2_df.shape[1] - 1 if not sheet2_df.empty else -1
-        max_col_sheet3 = sheet3_df.shape[1] - 1 if not sheet3_df.empty else -1
-
-        # Sheet1'den çekilecek tüm indeksler ve eşleşme indeksi
-        all_required_sheet1_indices = list(set(sheet1_display_indices + [self.matching_col_sheet1_idx]))
-        # Sheet2'den çekilecek tüm indeksler ve eşleşme indeksi
-        all_required_sheet2_indices = list(set(sheet2_display_indices + [self.matching_col_sheet23_idx]))
-        # Sheet3'ten çekilecek tüm indeksler ve eşleşme indeksi
-        all_required_sheet3_indices = list(set(sheet3_display_indices + [self.matching_col_sheet23_idx]))
-
-        if not all(idx <= max_col_sheet1 for idx in all_required_sheet1_indices):
-            missing_indices = [idx for idx in all_required_sheet1_indices if idx > max_col_sheet1]
-            QMessageBox.critical(self, "Hata", f"İlk sayfada eksik sütun indeksleri var: {missing_indices}. Mevcut max indeks: {max_col_sheet1}")
+    # -------------------------------------------------------------------- #
+    #                           Table population
+    # -------------------------------------------------------------------- #
+    def _open_table_page(self):
+        if not self.excel_data:
             return
-        if not all(idx <= max_col_sheet2 for idx in all_required_sheet2_indices):
-            missing_indices = [idx for idx in all_required_sheet2_indices if idx > max_col_sheet2]
-            QMessageBox.critical(self, "Hata", f"İkinci sayfada eksik sütun indeksleri var: {missing_indices}. Mevcut max indeks: {max_col_sheet2}")
-            return
-        if not all(idx <= max_col_sheet3 for idx in all_required_sheet3_indices):
-            missing_indices = [idx for idx in all_required_sheet3_indices if idx > max_col_sheet3]
-            QMessageBox.critical(self, "Hata", f"Üçüncü sayfada eksik sütun indeksleri var: {missing_indices}. Mevcut max indeks: {max_col_sheet3}")
-            return
+        self._populate_table()
+        self.stacked_widget.setCurrentWidget(self.table_page)
 
-        # Toplam sütun sayısı: Sheet1 (4) + Sheet2 (2) + Sheet3 (3) + K & L (2) = 11
-        self.table_widget.setColumnCount(
-            len(sheet1_display_indices) +
-            len(sheet2_display_indices) +
-            len(sheet3_display_indices) + 2  # +K, +L
-        )
+    def _populate_table(self):
+        df1 = self.excel_data["s1"]
+        df2 = self.excel_data["s2"]
+        df3 = self.excel_data["s3"]
 
-        headers = [
-            'A', 'B', 'C', 'D',  # Sheet‑1
-            'E', 'F',  # Sheet‑2
-            'H', 'I', 'J',  # Sheet‑3
-            'K', 'L'  # Yeni sütunlar
-        ]
-        self.table_widget.setHorizontalHeaderLabels(headers)
+        # 1) Filter + deduplicate rows in Sheet‑1 --------------------------
+        df1 = df1[
+            df1[self.SHEET1_COLS["C"]].notna() & df1[self.SHEET1_COLS["A"]].notna()
+        ].copy()
+        df1.drop_duplicates(subset=self.SHEET1_COLS["C"], keep="first", inplace=True)
 
-        # Tabloya veri doldurma
-        # Filtrelenmiş sheet1_df'in satır sayısını kullan
-        self.table_widget.setRowCount(len(sheet1_df))
+        # 2) Prepare table dimensions -------------------------------------
+        self.table.setColumnCount(len(self.HEADER_LABELS))
+        self.table.setHorizontalHeaderLabels(self.HEADER_LABELS)
+        self.table.setRowCount(len(df1))
 
-        for row_idx_new, row_data in enumerate(sheet1_df.itertuples(index=False)): # itertuples daha performanslı
-            # 1. sayfadan belirtilen indeksleri al
-            self.table_widget.setItem(row_idx_new, 0, QTableWidgetItem(str(row_data[self.sheet1_cols_map['A']])))
-            self.table_widget.setItem(row_idx_new, 1, QTableWidgetItem(str(row_data[self.sheet1_cols_map['C']])))
-            self.table_widget.setItem(row_idx_new, 2, QTableWidgetItem(str(row_data[self.sheet1_cols_map['G']])))
-            self.table_widget.setItem(row_idx_new, 3, QTableWidgetItem(str(row_data[self.sheet1_cols_map['E']])))
+        # 3) Fill rows -----------------------------------------------------
+        for r, row in enumerate(df1.itertuples(index=False)):
+            # Sheet‑1 cols
+            self.table.setItem(r, 0, QTableWidgetItem(str(row[self.SHEET1_COLS["A"]])))
+            self.table.setItem(r, 1, QTableWidgetItem(str(row[self.SHEET1_COLS["C"]])))
+            self.table.setItem(r, 2, QTableWidgetItem(str(row[self.SHEET1_COLS["G"]])))
+            self.table.setItem(r, 3, QTableWidgetItem(str(row[self.SHEET1_COLS["E"]])))
 
-            # Eşleştirme için 1. sayfadan C indeksi değerini al
-            matching_value_sheet1_c = row_data[self.matching_col_sheet1_idx]
+            match_val = row[self.SHEET1_COLS["C"]]
 
-            # 2. sayfadan G indeksi ile eşleşen verileri çek (B ve J'yi al, K'yı alma)
-            matched_sheet2_rows = sheet2_df[sheet2_df[self.matching_col_sheet23_idx] == matching_value_sheet1_c]
-            if not matched_sheet2_rows.empty:
-                s2_row = matched_sheet2_rows.iloc[0]
-                self.table_widget.setItem(row_idx_new, 4, QTableWidgetItem(str(s2_row[self.sheet2_specific_cols_map['B']])))
-                self.table_widget.setItem(row_idx_new, 5, QTableWidgetItem(str(s2_row[self.sheet2_specific_cols_map['J']])))
+            # Sheet‑2 match
+            s2_match = df2[df2[self.COMMON_MATCH_COL["G"]] == match_val]
+            if not s2_match.empty:
+                m = s2_match.iloc[0]
+                self.table.setItem(r, 4, QTableWidgetItem(str(m[self.SHEET2_COLS["B"]])))
+                self.table.setItem(r, 5, QTableWidgetItem(str(m[self.SHEET2_COLS["J"]])))
             else:
-                for col_offset in range(len(sheet2_display_indices)): # B, J için boş bırak (2 sütun)
-                    self.table_widget.setItem(row_idx_new, 4 + col_offset, QTableWidgetItem(""))
+                self.table.setItem(r, 4, QTableWidgetItem(""))
+                self.table.setItem(r, 5, QTableWidgetItem(""))
 
-            # 3. sayfadan G indeksi ile eşleşen verileri çek (B, J, K'yı al)
-            matched_sheet3_rows = sheet3_df[sheet3_df[self.matching_col_sheet23_idx] == matching_value_sheet1_c]
-            if not matched_sheet3_rows.empty:
-                s3_row = matched_sheet3_rows.iloc[0]
-                self.table_widget.setItem(row_idx_new, 6, QTableWidgetItem(str(s3_row[self.sheet3_specific_cols_map['B']])))
-                self.table_widget.setItem(row_idx_new, 7, QTableWidgetItem(str(s3_row[self.sheet3_specific_cols_map['J']])))
-                self.table_widget.setItem(row_idx_new, 8, QTableWidgetItem(str(s3_row[self.sheet3_specific_cols_map['K']])))
+            # Sheet‑3 match
+            s3_match = df3[df3[self.COMMON_MATCH_COL["G"]] == match_val]
+            if not s3_match.empty:
+                m3 = s3_match.iloc[0]
+                self.table.setItem(r, 6, QTableWidgetItem(str(m3[self.SHEET3_COLS["B"]])))
+                self.table.setItem(r, 7, QTableWidgetItem(str(m3[self.SHEET3_COLS["J"]])))
+                self.table.setItem(r, 8, QTableWidgetItem(str(m3[self.SHEET3_COLS["K"]])))
             else:
-                for col_offset in range(len(sheet3_display_indices)): # B, J, K için boş bırak (3 sütun)
-                    self.table_widget.setItem(row_idx_new, 6 + col_offset, QTableWidgetItem(""))
+                self.table.setItem(r, 6, QTableWidgetItem(""))
+                self.table.setItem(r, 7, QTableWidgetItem(""))
+                self.table.setItem(r, 8, QTableWidgetItem(""))
 
-            # --- K sütunu (ihtiyaç) başlangıçta boş; kullanıcı girince çarpım yapılacak
-            self.table_widget.setItem(row_idx_new, 9, QTableWidgetItem(""))
+            # K (need) initially empty
+            self.table.setItem(r, 9, QTableWidgetItem(""))
 
-            # --- L sütunu: (F + I + J) - K  → ilk etapta K=0 kabul edilir
-            f_val = float(self.table_widget.item(row_idx_new, 5).text() or 0)
-            i_val = float(self.table_widget.item(row_idx_new, 7).text() or 0)
-            j_val = float(self.table_widget.item(row_idx_new, 8).text() or 0)
-            l_result = f_val + i_val + j_val  # K şimdilik 0
+            # L initial calc (K assumed 0)
+            self._update_l_column(r)
 
-            l_item = QTableWidgetItem(str(l_result))
-            l_item.setFlags(l_item.flags() ^ Qt.ItemIsEditable)  # Kullanıcı düzenleyemesin
-            self.table_widget.setItem(row_idx_new, 10, l_item)
+        # 4) Resize + connect once ----------------------------------------
+        self.table.resizeColumnsToContents()
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        self.table.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
+        self.table.verticalHeader().setDefaultSectionSize(30)
 
-        self.table_widget.resizeColumnsToContents()
-        self.table_widget.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
-        self.table_widget.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
-        self.table_widget.verticalHeader().setDefaultSectionSize(30)
-        self.table_widget.cellChanged.connect(self.handle_cell_changed)
-
-    def handle_cell_changed(self, row: int, col: int):
-            # Yalnızca K sütunu (index 9) izlenir
-            if col != 9:
-                return
-
+        if self._cell_connected:
             try:
-                k_input = float(self.table_widget.item(row, col).text().replace(',', '.'))
+                self.table.cellChanged.disconnect(self._cell_changed)
+            except TypeError:
+                pass
+        self.table.cellChanged.connect(self._cell_changed)
+        self._cell_connected = True
+
+    # -------------------------------------------------------------------- #
+    #                        Cell change handlers
+    # -------------------------------------------------------------------- #
+    def _cell_changed(self, row: int, col: int):
+        if self._updating or col != 9:
+            return
+
+        try:
+            k_raw = self.table.item(row, col).text().replace(",", ".")
+            k_coef = float(k_raw)
+        except (ValueError, AttributeError):
+            return  # invalid input
+
+        try:
+            d_val = float(self.table.item(row, 3).text().replace(",", "."))
+        except (ValueError, AttributeError):
+            d_val = 0.0
+
+        need = d_val * k_coef
+
+        # propagate to selection if multiple K cells are selected ----------
+        sel_ranges = self.table.selectedRanges()
+        k_rows = {row}
+        for rng in sel_ranges:
+            if rng.leftColumn() <= 9 <= rng.rightColumn():
+                k_rows.update(range(rng.topRow(), rng.bottomRow() + 1))
+
+        self._updating = True
+        for r in k_rows:
+            # recalculate per row (different D)
+            try:
+                d_cell = float(self.table.item(r, 3).text().replace(",", "."))
             except (ValueError, AttributeError):
-                return  # Geçersiz giriş
+                d_cell = 0.0
+            self.table.setItem(r, 9, QTableWidgetItem(str(d_cell * k_coef)))
+            self._update_l_column(r)
+        self._updating = False
 
-            # D sütunundaki miktar (index 3)
-            try:
-                d_val = float(self.table_widget.item(row, 3).text().replace(',', '.'))
-            except (ValueError, AttributeError):
-                d_val = 0.0
+    def _to_float(self, item: QTableWidgetItem) -> float:
+        try:
+            return float(item.text().replace(",", "."))
+        except (ValueError, AttributeError):
+            return 0.0
 
-            product = d_val * k_input
+    def _update_l_column(self, row: int):
+        f_val = self._to_float(self.table.item(row, 5))
+        i_val = self._to_float(self.table.item(row, 7))
+        j_val = self._to_float(self.table.item(row, 8))
+        k_val = self._to_float(self.table.item(row, 9))
 
-            # Sonsuz döngüyü önlemek için sinyalleri kapat
-            self.table_widget.blockSignals(True)
-            self.table_widget.item(row, col).setText(str(product))
-            self.update_l_column(row)
-            self.table_widget.blockSignals(False)
+        result = f_val + i_val + j_val - k_val
+        text = f"{result} #SİPARİŞ VER" if result < 0 else str(result)
 
-    def update_l_column(self, row: int):
-            def to_float(item):
-                try:
-                    return float(item.text().replace(',', '.'))
-                except (ValueError, AttributeError):
-                    return 0.0
+        item = self.table.item(row, 10)
+        if item is None:
+            item = QTableWidgetItem()
+            item.setFlags(item.flags() ^ Qt.ItemIsEditable)
+            self.table.setItem(row, 10, item)
+        item.setText(text)
 
-            f_val = to_float(self.table_widget.item(row, 5))
-            i_val = to_float(self.table_widget.item(row, 7))
-            j_val = to_float(self.table_widget.item(row, 8))
-            k_val = to_float(self.table_widget.item(row, 9))
+    # -------------------------------------------------------------------- #
+    #                           Save to Excel
+    # -------------------------------------------------------------------- #
+    def _save_excel(self):
+        path, _ = QFileDialog.getSaveFileName(self, "Uyarlanmış Excel Dosyasını Kaydet", "uyarlanmis_veri.xlsx", "Excel Dosyaları (*.xlsx)")
+        if not path:
+            return
 
-            result = f_val + i_val + j_val - k_val
-            text = f"{result} #SİPARİŞ VER" if result < 0 else str(result)
+        rows, cols = self.table.rowCount(), self.table.columnCount()
+        data = [[self.table.item(r, c).text() if self.table.item(r, c) else "" for c in range(cols)] for r in range(rows)]
 
-            l_item = self.table_widget.item(row, 10)
-            if l_item is None:
-                l_item = QTableWidgetItem(text)
-                l_item.setFlags(l_item.flags() ^ Qt.ItemIsEditable)
-                self.table_widget.setItem(row, 10, l_item)
-            else:
-                l_item.setText(text)
+        def col_name(n):
+            name = ""
+            while n >= 0:
+                name = chr(n % 26 + ord("A")) + name
+                n = n // 26 - 1
+            return name
 
-    def save_custom_excel(self):
-        options = QFileDialog.Options()
-        file_path, _ = QFileDialog.getSaveFileName(self,
-                                                   "Uyarlanmış Excel Dosyasını Kaydet",
-                                                   "uyarlanmis_veri.xlsx",
-                                                   "Excel Dosyaları (*.xlsx)",
-                                                   options=options)
-        if file_path:
-            try:
-                row_count = self.table_widget.rowCount()
-                column_count = self.table_widget.columnCount()
-                data = []
+        headers = [col_name(i) for i in range(cols)]
+        pd.DataFrame(data, columns=headers).to_excel(path, index=False)
+        QMessageBox.information(self, "Başarılı", f"Dosya kaydedildi: {path.split('/')[-1]}")
 
-                for row in range(row_count):
-                    row_data = []
-                    for col in range(column_count):
-                        item = self.table_widget.item(row, col)
-                        row_data.append(item.text() if item else "")
-                    data.append(row_data)
 
-                # Yeni oluşturulan dosya için A, B, C... şeklinde sütun isimleri oluştur
-                def excel_column_name(n):
-                    name = ''
-                    while n >= 0:
-                        name = chr(n % 26 + ord('A')) + name
-                        n = n // 26 - 1
-                    return name
-
-                new_excel_headers = [excel_column_name(i) for i in range(column_count)]
-
-                df_to_save = pd.DataFrame(data, columns=new_excel_headers)
-
-                df_to_save.to_excel(file_path, index=False)
-                QMessageBox.information(self, "Başarılı", f"Dosya başarıyla kaydedildi:\n{file_path.split('/')[-1]}")
-            except Exception as e:
-                QMessageBox.critical(self, "Hata", f"Dosya kaydedilirken bir hata oluştu: {e}")
-
+# ----------------------------------------------------------------------- #
+#                                   main
+# ----------------------------------------------------------------------- #
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    ex = ExcelProcessorApp()
-    ex.show()
+    window = ExcelProcessorApp()
+    window.show()
     sys.exit(app.exec_())
