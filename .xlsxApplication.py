@@ -374,32 +374,20 @@ class ExcelProcessorApp(QMainWindow):
     def _save_excel(self):
         """Saves the current data from the QTableWidget to a new Excel file."""
         # Open a save file dialog
-        path, _ = QFileDialog.getSaveFileName(self, "Uyarlanmış Excel Dosyasını Kaydet", "uyarlanmis_veri.xlsx",
-                                              "Excel Dosyaları (*.xlsx)")
-        if not path:  # If no path is selected, return
+        path, _ = QFileDialog.getSaveFileName(self, "Uyarlanmış Excel Dosyasını Kaydet", "uyarlanmis_veri.xlsx", "Excel Dosyaları (*.xlsx)")
+        if not path: # If no path is selected, return
             return
 
         rows, cols = self.table.rowCount(), self.table.columnCount()
         # Extract all data from the QTableWidget into a list of lists,
-        # starting from the second row (index 1) to exclude the header row.
-        data = [[self.table.item(r, c).text() if self.table.item(r, c) else "" for c in range(cols)] for r in
-                range(1, rows)]
+        # starting from the first row (index 0) since HEADER_LABELS will be used as headers.
+        data = [[self.table.item(r, c).text() if self.table.item(r, c) else "" for c in range(cols)] for r in range(rows)]
 
-        def col_name(n):
-            """Helper function to convert column index to Excel-style column name (A, B, ..., AA, AB, ...)"""
-            name = ""
-            while n >= 0:
-                name = chr(n % 26 + ord("A")) + name
-                n = n // 26 - 1
-            return name
-
-        # Generate Excel-style column headers (A, B, C, ...)
-        headers = [col_name(i) for i in range(cols)]
-        # Create a pandas DataFrame from the table data and save it to Excel
-        # The 'header=False' argument has been removed to ensure that pandas writes
-        # the 'headers' list as the column headers in the Excel file.
-        pd.DataFrame(data, columns=headers).to_excel(path, index=False)
+        # Use the predefined HEADER_LABELS directly as column headers for the DataFrame
+        # The 'col_name' function is no longer needed here.
+        pd.DataFrame(data, columns=self.HEADER_LABELS).to_excel(path, index=False)
         QMessageBox.information(self, "Başarılı", f"Dosya kaydedildi: {path.split('/')[-1]}")
+
 
 
 # ----------------------------------------------------------------------- #
