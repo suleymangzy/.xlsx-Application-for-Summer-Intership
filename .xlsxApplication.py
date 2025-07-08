@@ -40,9 +40,9 @@ class ExcelProcessorApp(QMainWindow):
 
     # Header labels for the displayed QTableWidget
     HEADER_LABELS = [
-        "A", "B", "C", "D",  # Corresponds to Sheet-1 columns A, C, G, E
-        "E", "F",  # Corresponds to Sheet-2 columns B, J (summed)
-        "H", "I", "J",  # Corresponds to Sheet-3 columns B, J (summed), K (summed)
+        "Ü.Ağacı Sev", "Malzeme", "Açıklama", "Miktar",  # Corresponds to Sheet-1 columns A, C, G, E
+        "Depo 100", "Kullanılabilir Stok",  # Corresponds to Sheet-2 columns B, J (summed)
+        "Depo 110", "Kullanılabilir Stok", "Kalite Stoğu",  # Corresponds to Sheet-3 columns B, J (summed), K (summed)
         "İhtiyaç", "Durum",  # New columns K and L
     ]
 
@@ -380,9 +380,10 @@ class ExcelProcessorApp(QMainWindow):
             return
 
         rows, cols = self.table.rowCount(), self.table.columnCount()
-        # Extract all data from the QTableWidget into a list of lists
+        # Extract all data from the QTableWidget into a list of lists,
+        # starting from the second row (index 1) to exclude the header row.
         data = [[self.table.item(r, c).text() if self.table.item(r, c) else "" for c in range(cols)] for r in
-                range(rows)]
+                range(1, rows)]
 
         def col_name(n):
             """Helper function to convert column index to Excel-style column name (A, B, ..., AA, AB, ...)"""
@@ -395,6 +396,8 @@ class ExcelProcessorApp(QMainWindow):
         # Generate Excel-style column headers (A, B, C, ...)
         headers = [col_name(i) for i in range(cols)]
         # Create a pandas DataFrame from the table data and save it to Excel
+        # The 'header=False' argument has been removed to ensure that pandas writes
+        # the 'headers' list as the column headers in the Excel file.
         pd.DataFrame(data, columns=headers).to_excel(path, index=False)
         QMessageBox.information(self, "Başarılı", f"Dosya kaydedildi: {path.split('/')[-1]}")
 
