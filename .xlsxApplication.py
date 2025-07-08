@@ -224,6 +224,10 @@ class ExcelProcessorApp(QMainWindow):
         # Remove duplicate rows based on column C, keeping the first occurrence
         df1.drop_duplicates(subset=self.SHEET1_COLS["C"], keep="first", inplace=True)
 
+        # New: Filter rows where 'Malzeme' column (original index 2) has 3 or more hyphens
+        # Convert to string to use .str methods, then count occurrences of '-'
+        df1 = df1[df1[self.SHEET1_COLS["C"]].astype(str).str.count('-') < 3].copy()
+
         # 2) Prepare table dimensions -------------------------------------
         self.table.setColumnCount(len(self.HEADER_LABELS))  # Set number of columns based on headers
         self.table.setHorizontalHeaderLabels(self.HEADER_LABELS)  # Set column headers
