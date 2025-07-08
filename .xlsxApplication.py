@@ -39,7 +39,8 @@ class ExcelProcessorApp(QMainWindow):
     COMMON_MATCH_COL = {"G": 6}  # Column G (index 6) is used for matching across sheets
     # New: Column mappings for the 4th sheet
     # Assuming 2nd index (column C) for matching material, 8th index (column I) for ordered quantity
-    SHEET4_COLS = {"C": 2, "I": 8}
+    # New: 18th index (column S) for delivery date
+    SHEET4_COLS = {"C": 2, "I": 8, "S": 18}
 
     # Header labels for the displayed QTableWidget
     HEADER_LABELS = [
@@ -47,7 +48,8 @@ class ExcelProcessorApp(QMainWindow):
         "Depo 100", "Kullanılabilir Stok",  # Corresponds to Sheet-2 columns B, J (summed)
         "Depo 110", "Kullanılabilir Stok", "Kalite Stoğu",  # Corresponds to Sheet-3 columns B, J (summed), K (summed)
         "İhtiyaç", "Durum",  # New columns K and L
-        "Verilen Sipariş Miktarı", "Verilmesi Gereken Sipariş Miktarı"  # New columns for order quantities
+        "Verilen Sipariş Miktarı", "Verilmesi Gereken Sipariş Miktarı",  # New columns for order quantities
+        "Teslim Tarihi"  # New column for delivery date
     ]
 
     # --- Init / UI ------------------------------------------------------- #
@@ -169,7 +171,8 @@ class ExcelProcessorApp(QMainWindow):
 
     # -------------------------------------------------------------------- #
     #                           File selection
-    # -------------------------------------------------------------------- #
+    # --------------------------------------------------------------------  #
+
     def _select_file(self):
         """Opens a file dialog for the user to select an Excel file."""
         # GetOpenFileName returns (filePath, filter), we only need filePath
@@ -285,8 +288,22 @@ class ExcelProcessorApp(QMainWindow):
             # L (Durum) column (table index 10) initial calculation (K assumed 0)
             self._update_l_column(r)
 
-            # New: Update "Verilen Sipariş Miktarı" and "Verilmesi Gereken Sipariş Miktarı" columns
+            # Update "Verilen Sipariş Miktarı" and "Verilmesi Gereken Sipariş Miktarı" columns
             self._update_order_quantities(r, df4)
+
+            # New: Populate "Teslim Tarihi" column (table index 13)
+            teslim_tarihi_val = ""
+            s4_delivery_matches = df4[df4[self.SHEET4_COLS["C"]] == match_val]
+            if not s4_delivery_matches.empty:
+                # Get the delivery date from the 18th index (column S) of the first matching row
+                teslim_tarihi_val = str(s4_delivery_matches.iloc[0][self.SHEET4_COLS["S"]])
+
+            item_teslim_tarihi = self.table.item(r, 13)
+            if item_teslim_tarihi is None:
+                item_teslim_tarihi = QTableWidgetItem()
+                item_teslim_tarihi.setFlags(item_teslim_tarihi.flags() ^ Qt.ItemIsEditable)  # Make non-editable
+                self.table.setItem(r, 13, item_teslim_tarihi)
+            item_teslim_tarihi.setText(teslim_tarihi_val)
 
         # 4) Resize + connect once ----------------------------------------
         self.table.resizeColumnsToContents()  # Adjust column widths to fit content
@@ -324,8 +341,9 @@ class ExcelProcessorApp(QMainWindow):
             self._updating = True  # Set updating flag to prevent recursion
             self.table.setItem(row, col, QTableWidgetItem(""))  # Clear the invalid input
             self._update_l_column(row)  # Recalculate L for the current row with K=0
-            # New: Also update order quantities if K changes
+            # Also update order quantities and delivery date if K changes
             self._update_order_quantities(row, self.excel_data["s4"])
+            # The delivery date is static per material, so no need to re-fetch for all rows on K change
             self._updating = False  # Reset updating flag
             return
 
@@ -342,7 +360,7 @@ class ExcelProcessorApp(QMainWindow):
             self.table.setItem(r_idx, 9, QTableWidgetItem(str(calculated_k_value)))
             # Recalculate and update the L column for the current row based on the new K value
             self._update_l_column(r_idx)
-            # New: Also update order quantities if K changes
+            # Also update order quantities and delivery date if K changes
             self._update_order_quantities(r_idx, self.excel_data["s4"])
         self._updating = False  # Reset updating flag
 
