@@ -37,6 +37,9 @@ class ExcelProcessorApp(QMainWindow):
     SHEET2_COLS = {"B": 1, "J": 9}  # J is the column to be summed
     SHEET3_COLS = {"B": 1, "J": 9, "K": 10}  # J and K are the columns to be summed
     COMMON_MATCH_COL = {"G": 6}  # Column G (index 6) is used for matching across sheets
+    # New: Column mappings for the 4th sheet
+    # Assuming 2nd index (column C) for matching material, 8th index (column I) for ordered quantity
+    SHEET4_COLS = {"C": 2, "I": 8}
 
     # Header labels for the displayed QTableWidget
     HEADER_LABELS = [
@@ -44,6 +47,7 @@ class ExcelProcessorApp(QMainWindow):
         "Depo 100", "Kullanılabilir Stok",  # Corresponds to Sheet-2 columns B, J (summed)
         "Depo 110", "Kullanılabilir Stok", "Kalite Stoğu",  # Corresponds to Sheet-3 columns B, J (summed), K (summed)
         "İhtiyaç", "Durum",  # New columns K and L
+        "Verilen Sipariş Miktarı", "Verilmesi Gereken Sipariş Miktarı"  # New columns for order quantities
     ]
 
     # --- Init / UI ------------------------------------------------------- #
@@ -181,14 +185,17 @@ class ExcelProcessorApp(QMainWindow):
         try:
             xls = pd.ExcelFile(self.selected_file_path)  # Create an ExcelFile object
             self.sheet_names = xls.sheet_names  # Get all sheet names
-            if len(self.sheet_names) < 3:  # Check if at least 3 sheets are present
-                raise ValueError("Seçilen Excel dosyasında en least 3 sayfa bulunmalıdır.")
-            # Load the first three sheets into DataFrames, skipping the first row (index 0)
+            # New: Check if at least 4 sheets are present
+            if len(self.sheet_names) < 4:
+                raise ValueError("Seçilen Excel dosyasında en az 4 sayfa bulunmalıdır.")
+            # Load the first four sheets into DataFrames, skipping the first row (index 0)
             # This ensures that the original Excel file's first row is not processed.
             self.excel_data = {
                 "s1": pd.read_excel(xls, sheet_name=self.sheet_names[0], header=None, skiprows=[0]),
                 "s2": pd.read_excel(xls, sheet_name=self.sheet_names[1], header=None, skiprows=[0]),
                 "s3": pd.read_excel(xls, sheet_name=self.sheet_names[2], header=None, skiprows=[0]),
+                "s4": pd.read_excel(xls, sheet_name=self.sheet_names[3], header=None, skiprows=[0]),
+                # New: Load 4th sheet
             }
         except Exception as e:
             QMessageBox.critical(self, "Hata", f"Excel dosyası yüklenirken bir hata oluştu:\n{e}")
@@ -215,6 +222,7 @@ class ExcelProcessorApp(QMainWindow):
         df1 = self.excel_data["s1"]
         df2 = self.excel_data["s2"]
         df3 = self.excel_data["s3"]
+        df4 = self.excel_data["s4"]  # New: Get 4th DataFrame
 
         # 1) Filter + deduplicate rows in Sheet‑1 --------------------------
         # Filter rows where column C and A are not empty
@@ -224,7 +232,7 @@ class ExcelProcessorApp(QMainWindow):
         # Remove duplicate rows based on column C, keeping the first occurrence
         df1.drop_duplicates(subset=self.SHEET1_COLS["C"], keep="first", inplace=True)
 
-        # New: Filter rows where 'Malzeme' column (original index 2) has 3 or more hyphens
+        # Filter rows where 'Malzeme' column (original index 2) has 3 or more hyphens
         # Convert to string to use .str methods, then count occurrences of '-'
         df1 = df1[df1[self.SHEET1_COLS["C"]].astype(str).str.count('-') < 3].copy()
 
@@ -277,6 +285,9 @@ class ExcelProcessorApp(QMainWindow):
             # L (Durum) column (table index 10) initial calculation (K assumed 0)
             self._update_l_column(r)
 
+            # New: Update "Verilen Sipariş Miktarı" and "Verilmesi Gereken Sipariş Miktarı" columns
+            self._update_order_quantities(r, df4)
+
         # 4) Resize + connect once ----------------------------------------
         self.table.resizeColumnsToContents()  # Adjust column widths to fit content
         # Allow users to resize columns manually
@@ -313,6 +324,8 @@ class ExcelProcessorApp(QMainWindow):
             self._updating = True  # Set updating flag to prevent recursion
             self.table.setItem(row, col, QTableWidgetItem(""))  # Clear the invalid input
             self._update_l_column(row)  # Recalculate L for the current row with K=0
+            # New: Also update order quantities if K changes
+            self._update_order_quantities(row, self.excel_data["s4"])
             self._updating = False  # Reset updating flag
             return
 
@@ -329,6 +342,8 @@ class ExcelProcessorApp(QMainWindow):
             self.table.setItem(r_idx, 9, QTableWidgetItem(str(calculated_k_value)))
             # Recalculate and update the L column for the current row based on the new K value
             self._update_l_column(r_idx)
+            # New: Also update order quantities if K changes
+            self._update_order_quantities(r_idx, self.excel_data["s4"])
         self._updating = False  # Reset updating flag
 
     def _to_float(self, item: QTableWidgetItem) -> float:
@@ -373,6 +388,54 @@ class ExcelProcessorApp(QMainWindow):
             item.setFlags(item.flags() ^ Qt.ItemIsEditable)
             self.table.setItem(row, 10, item)
         item.setText(text)  # Set the calculated text
+
+    def _update_order_quantities(self, row: int, df4: pd.DataFrame):
+        """
+        Calculates and updates 'Verilen Sipariş Miktarı' and 'Verilmesi Gereken Sipariş Miktarı'
+        for a given row based on 'Durum' column and 4th Excel sheet.
+        """
+        durum_item = self.table.item(row, 10)  # 'Durum' column
+        malzeme_item = self.table.item(row, 1)  # 'Malzeme' column
+
+        verilen_siparis_miktari = 0.0
+        verilmesi_gereken_siparis_miktari = 0.0
+
+        if durum_item and "#SİPARİŞ VER" in durum_item.text():
+            try:
+                # Extract the numeric part of the 'Durum' value
+                durum_numeric_str = durum_item.text().split(" #SİPARİŞ VER")[0].replace(",", ".")
+                durum_numeric_val = float(durum_numeric_str)
+            except (ValueError, AttributeError):
+                durum_numeric_val = 0.0
+
+            if malzeme_item:
+                malzeme_val = malzeme_item.text()
+                # Find matches in the 4th sheet based on 'Malzeme' (column C, index 2)
+                s4_matches = df4[df4[self.SHEET4_COLS["C"]] == malzeme_val]
+
+                if not s4_matches.empty:
+                    # Sum values from the 8th index column (column I) in the 4th sheet
+                    verilen_siparis_miktari = s4_matches[self.SHEET4_COLS["I"]].apply(self._to_float_series).sum()
+
+            # Calculate 'Verilmesi Gereken Sipariş Miktarı'
+            remaining_needed = durum_numeric_val - verilen_siparis_miktari
+            verilmesi_gereken_siparis_miktari = max(0.0, remaining_needed)  # Ensure it's not negative
+
+        # Set items for "Verilen Sipariş Miktarı" (index 11)
+        item_verilen = self.table.item(row, 11)
+        if item_verilen is None:
+            item_verilen = QTableWidgetItem()
+            item_verilen.setFlags(item_verilen.flags() ^ Qt.ItemIsEditable)  # Make non-editable
+            self.table.setItem(row, 11, item_verilen)
+        item_verilen.setText(str(verilen_siparis_miktari))
+
+        # Set items for "Verilmesi Gereken Sipariş Miktarı" (index 12)
+        item_gereken = self.table.item(row, 12)
+        if item_gereken is None:
+            item_gereken = QTableWidgetItem()
+            item_gereken.setFlags(item_gereken.flags() ^ Qt.ItemIsEditable)  # Make non-editable
+            self.table.setItem(row, 12, item_gereken)
+        item_gereken.setText(str(verilmesi_gereken_siparis_miktari))
 
     def _process_fsnkp_rows(self):
         """
