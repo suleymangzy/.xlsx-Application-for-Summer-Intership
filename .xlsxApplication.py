@@ -295,8 +295,14 @@ class ExcelProcessorApp(QMainWindow):
             teslim_tarihi_val = ""
             s4_delivery_matches = df4[df4[self.SHEET4_COLS["C"]] == match_val]
             if not s4_delivery_matches.empty:
-                # Get the delivery date from the 18th index (column S) of the first matching row
-                teslim_tarihi_val = str(s4_delivery_matches.iloc[0][self.SHEET4_COLS["S"]])
+                raw_date = s4_delivery_matches.iloc[0][self.SHEET4_COLS["S"]]
+                try:
+                    # Attempt to convert to datetime and format to DD.MM.YYYY
+                    formatted_date = pd.to_datetime(raw_date).strftime('%d.%m.%Y')
+                    teslim_tarihi_val = formatted_date
+                except (ValueError, TypeError):
+                    # If conversion fails, keep it as original string or empty
+                    teslim_tarihi_val = str(raw_date) if pd.notna(raw_date) else ""
 
             item_teslim_tarihi = self.table.item(r, 13)
             if item_teslim_tarihi is None:
@@ -341,9 +347,8 @@ class ExcelProcessorApp(QMainWindow):
             self._updating = True  # Set updating flag to prevent recursion
             self.table.setItem(row, col, QTableWidgetItem(""))  # Clear the invalid input
             self._update_l_column(row)  # Recalculate L for the current row with K=0
-            # Also update order quantities and delivery date if K changes
+            # Also update order quantities if K changes
             self._update_order_quantities(row, self.excel_data["s4"])
-            # The delivery date is static per material, so no need to re-fetch for all rows on K change
             self._updating = False  # Reset updating flag
             return
 
@@ -360,7 +365,7 @@ class ExcelProcessorApp(QMainWindow):
             self.table.setItem(r_idx, 9, QTableWidgetItem(str(calculated_k_value)))
             # Recalculate and update the L column for the current row based on the new K value
             self._update_l_column(r_idx)
-            # Also update order quantities and delivery date if K changes
+            # Also update order quantities if K changes
             self._update_order_quantities(r_idx, self.excel_data["s4"])
         self._updating = False  # Reset updating flag
 
