@@ -347,7 +347,7 @@ class ExcelProcessorApp(QMainWindow):
         self._updating = False  # Reset updating flag
 
     def _to_float(self, item: QTableWidgetItem) -> float:
-        """Converts a QTableWidgetItem's text to a float, handling commas and empty strings."""
+        """QTableWidgetItem'ın metnini float'a dönüştürür, virgülleri ve boş dizeleri işler."""
         try:
             if item is None or item.text() == "":
                 return 0.0
@@ -356,53 +356,52 @@ class ExcelProcessorApp(QMainWindow):
             return 0.0
 
     def _to_float_series(self, value) -> float:
-        """Converts a value from a pandas Series to float, handling non-numeric values
-        and comma decimal separators."""
+        """Pandas Serisindeki bir değeri float'a dönüştürür, sayısal olmayan değerleri
+        ve virgül ondalık ayırıcılarını işler."""
         try:
             if isinstance(value, str):
-                # Remove thousands separators (if any) and replace comma decimal with dot
+                # Binlik ayırıcıları (varsa) kaldırır ve virgül ondalık ayırıcısını nokta ile değiştirir
                 value = value.replace(".", "").replace(",", ".")
             return float(value)
         except (ValueError, TypeError):
             return 0.0
 
     def _update_l_column(self, row: int):
-        """Calculates and updates the 'Durum' (L) column based on values in
-        columns F, I, J, and K for a given row."""
-        # Get values from relevant columns, converting them to float
-        f_val = self._to_float(self.table.item(row, 5))  # Column F (Sheet 2 J sum)
-        i_val = self._to_float(self.table.item(row, 7))  # Column I (Sheet 3 J sum)
-        j_val = self._to_float(self.table.item(row, 8))  # Column J (Sheet 3 K sum)
-        k_val = self._to_float(self.table.item(row, 9))  # Column K (İhtiyaç)
+        """Belirli bir satır için F, I, J ve K sütunlarındaki değerlere göre 'Durum' (L) sütununu hesaplar ve günceller."""
+        # İlgili sütunlardan değerleri alır, float'a dönüştürür
+        f_val = self._to_float(self.table.item(row, 5))  # Sütun F (Sayfa 2 J toplamı)
+        i_val = self._to_float(self.table.item(row, 7))  # Sütun I (Sayfa 3 J toplamı)
+        j_val = self._to_float(self.table.item(row, 8))  # Sütun J (Sayfa 3 K toplamı)
+        k_val = self._to_float(self.table.item(row, 9))  # Sütun K (İhtiyaç)
 
-        # Calculate the result for 'Durum' (L)
+        # 'Durum' (L) için sonucu hesaplar
         result = f_val + i_val + j_val - k_val
-        # Format the text: if result is negative, add "#SİPARİŞ VER"
+        # Metni biçimlendirir: eğer sonuç negatifse, "#SİPARİŞ VER" ekler
         text = f"{result} #SİPARİŞ VER" if result < 0 else str(result)
 
-        # Get or create the QTableWidgetItem for the L column
+        # L sütunu için QTableWidgetItem'ı alır veya oluşturur
         item = self.table.item(row, 10)
         if item is None:
             item = QTableWidgetItem()
-            # Make the L column non-editable as it's a calculated field
+            # L sütununu hesaplanmış bir alan olduğu için düzenlenemez yapar
             item.setFlags(item.flags() ^ Qt.ItemIsEditable)
             self.table.setItem(row, 10, item)
-        item.setText(text)  # Set the calculated text
+        item.setText(text)  # Hesaplanan metni ayarlar
 
     def _update_order_quantities(self, row: int, df4: pd.DataFrame):
         """
-        Calculates and updates 'Verilen Sipariş Miktarı' and 'Verilmesi Gereken Sipariş Miktarı'
-        for a given row based on 'Durum' column and 4th Excel sheet.
+        'Durum' sütunu ve 4. Excel sayfasına göre belirli bir satır için 'Verilen Sipariş Miktarı' ve
+        'Verilmesi Gereken Sipariş Miktarı'nı hesaplar ve günceller.
         """
-        durum_item = self.table.item(row, 10)  # 'Durum' column
-        malzeme_item = self.table.item(row, 1)  # 'Malzeme' column
+        durum_item = self.table.item(row, 10)  # 'Durum' sütunu
+        malzeme_item = self.table.item(row, 1)  # 'Malzeme' sütunu
 
         verilen_siparis_miktari = 0.0
         verilmesi_gereken_siparis_miktari = 0.0
 
         if durum_item and "#SİPARİŞ VER" in durum_item.text():
             try:
-                # Extract the numeric part of the 'Durum' value
+                # 'Durum' değerinin sayısal kısmını çıkarır
                 durum_numeric_str = durum_item.text().split(" #SİPARİŞ VER")[0].replace(",", ".")
                 durum_numeric_val = float(durum_numeric_str)
             except (ValueError, AttributeError):
@@ -410,85 +409,91 @@ class ExcelProcessorApp(QMainWindow):
 
             if malzeme_item:
                 malzeme_val = malzeme_item.text()
-                # Find matches in the 4th sheet based on 'Malzeme' (column C, index 2)
+                # 4. sayfada 'Malzeme'ye (C sütunu, indeks 2) göre eşleşmeleri bulur
                 s4_matches = df4[df4[self.SHEET4_COLS["C"]] == malzeme_val]
 
                 if not s4_matches.empty:
-                    # Sum values from the 8th index column (column I) in the 4th sheet
+                    # 4. sayfadaki 8. indeks sütunundaki (I sütunu) değerleri toplar
                     verilen_siparis_miktari = s4_matches[self.SHEET4_COLS["I"]].apply(self._to_float_series).sum()
 
-            # Calculate 'Verilmesi Gereken Sipariş Miktarı'
-            remaining_needed = durum_numeric_val - verilen_siparis_miktari
-            verilmesi_gereken_siparis_miktari = max(0.0, remaining_needed)  # Ensure it's not negative
+            # Yeni: 'Verilmesi Gereken Sipariş Miktarı'nı hesaplar
+            # Durum sütunundaki değer ile Verilen Sipariş Miktarı'nı toplar
+            remaining_needed = durum_numeric_val + verilen_siparis_miktari
 
-        # Set items for "Verilen Sipariş Miktarı" (index 11)
+            # Eğer kalan değer negatifse, mutlak değerini alır; pozitif veya sıfırsa 0 yazar
+            if remaining_needed < 0:
+                verilmesi_gereken_siparis_miktari = abs(remaining_needed)
+            else:
+                verilmesi_gereken_siparis_miktari = 0.0
+
+        # "Verilen Sipariş Miktarı" (indeks 11) için öğeleri ayarlar
         item_verilen = self.table.item(row, 11)
         if item_verilen is None:
             item_verilen = QTableWidgetItem()
-            item_verilen.setFlags(item_verilen.flags() ^ Qt.ItemIsEditable)  # Make non-editable
+            item_verilen.setFlags(item_verilen.flags() ^ Qt.ItemIsEditable)  # Düzenlenemez yapar
             self.table.setItem(row, 11, item_verilen)
         item_verilen.setText(str(verilen_siparis_miktari))
 
-        # Set items for "Verilmesi Gereken Sipariş Miktarı" (index 12)
+        # "Verilmesi Gereken Sipariş Miktarı" (indeks 12) için öğeleri ayarlar
         item_gereken = self.table.item(row, 12)
         if item_gereken is None:
             item_gereken = QTableWidgetItem()
-            item_gereken.setFlags(item_gereken.flags() ^ Qt.ItemIsEditable)  # Make non-editable
+            item_gereken.setFlags(item_gereken.flags() ^ Qt.ItemIsEditable)  # Düzenlenemez yapar
             self.table.setItem(row, 12, item_gereken)
         item_gereken.setText(str(verilmesi_gereken_siparis_miktari))
 
     def _process_fsnkp_rows(self):
         """
-        Processes rows to remove 'FSNKP' entries and update the 'Durum' column of the preceding row.
-        Iterates backwards to handle row deletion correctly.
+        'FSNKP' girişlerini kaldırmak ve önceki satırın 'Durum' sütununu güncellemek için satırları işler.
+        Satır silme işlemini doğru şekilde ele almak için geriye doğru yineler.
         """
-        self._updating = True  # Prevent cellChanged signal from firing during this process
+        self._updating = True  # Bu işlem sırasında cellChanged sinyalinin tetiklenmesini önler
 
         rows_to_remove = []
-        # Iterate backwards from the second-to-last row down to the first data row (index 1)
-        # We need to check against the previous row, so we stop at index 1.
+        # Sondan bir önceki satırdan ilk veri satırına (indeks 1) kadar geriye doğru yineler
+        # Önceki satırı kontrol etmemiz gerektiği için indeks 1'de dururuz.
         for r_idx in range(self.table.rowCount() - 1, 0, -1):
             current_malzeme = self.table.item(r_idx, 1).text() if self.table.item(r_idx, 1) else ""
             prev_malzeme = self.table.item(r_idx - 1, 1).text() if self.table.item(r_idx - 1, 1) else ""
             current_aciklama = self.table.item(r_idx, 2).text() if self.table.item(r_idx, 2) else ""
 
-            # Check if current row's 'Malzeme' (column 1) matches previous row's 'Malzeme'
-            # and current row's 'Açıklama' (column 2) contains "FSNKP"
+            # Geçerli satırın 'Malzeme'si (sütun 1) önceki satırın 'Malzeme'siyle eşleşiyor mu kontrol eder
+            # ve geçerli satırın 'Açıklama'sı (sütun 2) "FSNKP" içeriyor mu kontrol eder
             if current_malzeme == prev_malzeme and "FSNKP" in current_aciklama:
-                # Add "#FSNKP" to the 'Durum' column (column 10) of the previous row
+                # Önceki satırın 'Durum' sütununa (sütun 10) "#FSNKP" ekler
                 prev_durum_item = self.table.item(r_idx - 1, 10)
                 if prev_durum_item:
                     current_durum_text = prev_durum_item.text()
-                    if "#FSNKP" not in current_durum_text:  # Avoid adding duplicate "#FSNKP"
+                    if "#FSNKP" not in current_durum_text:  # Tekrarlayan "#FSNKP" eklemekten kaçınır
                         prev_durum_item.setText(current_durum_text + " #FSNKP")
 
-                # Mark the current row for removal
+                # Geçerli satırı kaldırmak için işaretler
                 rows_to_remove.append(r_idx)
 
-        # Remove rows marked for removal (from highest index to lowest to avoid index shifting issues)
+        # Kaldırılacak satırları kaldırır (indeks kayması sorunlarını önlemek için en yüksek indeksten en düşüğe doğru)
         for r_idx in sorted(rows_to_remove, reverse=True):
             self.table.removeRow(r_idx)
 
-        self._updating = False  # Re-enable cellChanged signal
+        self._updating = False  # cellChanged sinyalini yeniden etkinleştirir
 
     # -------------------------------------------------------------------- #
     #                           Save to Excel
     # -------------------------------------------------------------------- #
     def _save_excel(self):
-        """Saves the current data from the QTableWidget to a new Excel file."""
-        # Open a save file dialog
+        """Geçerli verileri QTableWidget'tan yeni bir Excel dosyasına kaydeder."""
+        # Bir kaydetme dosyası iletişim kutusu açar
         path, _ = QFileDialog.getSaveFileName(self, "Uyarlanmış Excel Dosyasını Kaydet", "uyarlanmis_veri.xlsx",
                                               "Excel Dosyaları (*.xlsx)")
-        if not path:  # If no path is selected, return
+        if not path:  # Eğer yol seçilmezse, geri döner
             return
 
         rows, cols = self.table.rowCount(), self.table.columnCount()
-        # Extract all data from the QTableWidget into a list of lists,
-        # starting from the second row (index 1) to exclude the first data row from the saved file.
+        # QTableWidget'tan tüm verileri bir listeler listesine çıkarır,
+        # kaydedilen dosyadan ilk veri satırını hariç tutmak için ikinci satırdan (indeks 1) başlar.
         data = [[self.table.item(r, c).text() if self.table.item(r, c) else "" for c in range(cols)] for r in
                 range(1, rows)]
 
-        # Use the predefined HEADER_LABELS directly as column headers for the DataFrame
+        # Önceden tanımlanmış HEADER_LABELS'ı DataFrame için sütun başlıkları olarak doğrudan kullanır
         pd.DataFrame(data, columns=self.HEADER_LABELS).to_excel(path, index=False)
         QMessageBox.information(self, "Başarılı", f"Dosya kaydedildi: {path.split('/')[-1]}")
 
@@ -497,7 +502,7 @@ class ExcelProcessorApp(QMainWindow):
 #                                   main
 # ----------------------------------------------------------------------- #
 if __name__ == "__main__":
-    app = QApplication(sys.argv)  # Create the QApplication instance
-    window = ExcelProcessorApp()  # Create an instance of the main application window
-    window.show()  # Display the window
-    sys.exit(app.exec_())  # Start the application event loop
+    app = QApplication(sys.argv)  # QApplication örneğini oluşturur
+    window = ExcelProcessorApp()  # Ana uygulama penceresinin bir örneğini oluşturur
+    window.show()  # Pencereyi gösterir
+    sys.exit(app.exec_())  # Uygulama olay döngüsünü başlatır
