@@ -182,12 +182,13 @@ class ExcelProcessorApp(QMainWindow):
             xls = pd.ExcelFile(self.selected_file_path)  # Create an ExcelFile object
             self.sheet_names = xls.sheet_names  # Get all sheet names
             if len(self.sheet_names) < 3:  # Check if at least 3 sheets are present
-                raise ValueError("Seçilen Excel dosyasında en az 3 sayfa bulunmalıdır.")
-            # Load the first three sheets into DataFrames, without header (header=None)
+                raise ValueError("Seçilen Excel dosyasında en least 3 sayfa bulunmalıdır.")
+            # Load the first three sheets into DataFrames, skipping the first row (index 0)
+            # This ensures that the original Excel file's first row is not processed.
             self.excel_data = {
-                "s1": pd.read_excel(xls, sheet_name=self.sheet_names[0], header=None),
-                "s2": pd.read_excel(xls, sheet_name=self.sheet_names[1], header=None),
-                "s3": pd.read_excel(xls, sheet_name=self.sheet_names[2], header=None),
+                "s1": pd.read_excel(xls, sheet_name=self.sheet_names[0], header=None, skiprows=[0]),
+                "s2": pd.read_excel(xls, sheet_name=self.sheet_names[1], header=None, skiprows=[0]),
+                "s3": pd.read_excel(xls, sheet_name=self.sheet_names[2], header=None, skiprows=[0]),
             }
         except Exception as e:
             QMessageBox.critical(self, "Hata", f"Excel dosyası yüklenirken bir hata oluştu:\n{e}")
@@ -205,6 +206,7 @@ class ExcelProcessorApp(QMainWindow):
         if not self.excel_data:  # Ensure data is loaded
             return
         self._populate_table()  # Fill the QTableWidget with processed data
+        self._process_fsnkp_rows()  # Process FSNKP rows after initial population
         self.stacked_widget.setCurrentWidget(self.table_page)  # Switch to table page
 
     def _populate_table(self):
@@ -368,26 +370,60 @@ class ExcelProcessorApp(QMainWindow):
             self.table.setItem(row, 10, item)
         item.setText(text)  # Set the calculated text
 
+    def _process_fsnkp_rows(self):
+        """
+        Processes rows to remove 'FSNKP' entries and update the 'Durum' column of the preceding row.
+        Iterates backwards to handle row deletion correctly.
+        """
+        self._updating = True  # Prevent cellChanged signal from firing during this process
+
+        rows_to_remove = []
+        # Iterate backwards from the second-to-last row down to the first data row (index 1)
+        # We need to check against the previous row, so we stop at index 1.
+        for r_idx in range(self.table.rowCount() - 1, 0, -1):
+            current_malzeme = self.table.item(r_idx, 1).text() if self.table.item(r_idx, 1) else ""
+            prev_malzeme = self.table.item(r_idx - 1, 1).text() if self.table.item(r_idx - 1, 1) else ""
+            current_aciklama = self.table.item(r_idx, 2).text() if self.table.item(r_idx, 2) else ""
+
+            # Check if current row's 'Malzeme' (column 1) matches previous row's 'Malzeme'
+            # and current row's 'Açıklama' (column 2) contains "FSNKP"
+            if current_malzeme == prev_malzeme and "FSNKP" in current_aciklama:
+                # Add "#FSNKP" to the 'Durum' column (column 10) of the previous row
+                prev_durum_item = self.table.item(r_idx - 1, 10)
+                if prev_durum_item:
+                    current_durum_text = prev_durum_item.text()
+                    if "#FSNKP" not in current_durum_text:  # Avoid adding duplicate "#FSNKP"
+                        prev_durum_item.setText(current_durum_text + " #FSNKP")
+
+                # Mark the current row for removal
+                rows_to_remove.append(r_idx)
+
+        # Remove rows marked for removal (from highest index to lowest to avoid index shifting issues)
+        for r_idx in sorted(rows_to_remove, reverse=True):
+            self.table.removeRow(r_idx)
+
+        self._updating = False  # Re-enable cellChanged signal
+
     # -------------------------------------------------------------------- #
     #                           Save to Excel
     # -------------------------------------------------------------------- #
     def _save_excel(self):
         """Saves the current data from the QTableWidget to a new Excel file."""
         # Open a save file dialog
-        path, _ = QFileDialog.getSaveFileName(self, "Uyarlanmış Excel Dosyasını Kaydet", "uyarlanmis_veri.xlsx", "Excel Dosyaları (*.xlsx)")
-        if not path: # If no path is selected, return
+        path, _ = QFileDialog.getSaveFileName(self, "Uyarlanmış Excel Dosyasını Kaydet", "uyarlanmis_veri.xlsx",
+                                              "Excel Dosyaları (*.xlsx)")
+        if not path:  # If no path is selected, return
             return
 
         rows, cols = self.table.rowCount(), self.table.columnCount()
         # Extract all data from the QTableWidget into a list of lists,
-        # starting from the first row (index 0) since HEADER_LABELS will be used as headers.
-        data = [[self.table.item(r, c).text() if self.table.item(r, c) else "" for c in range(cols)] for r in range(rows)]
+        # starting from the second row (index 1) to exclude the first data row from the saved file.
+        data = [[self.table.item(r, c).text() if self.table.item(r, c) else "" for c in range(cols)] for r in
+                range(1, rows)]
 
         # Use the predefined HEADER_LABELS directly as column headers for the DataFrame
-        # The 'col_name' function is no longer needed here.
         pd.DataFrame(data, columns=self.HEADER_LABELS).to_excel(path, index=False)
         QMessageBox.information(self, "Başarılı", f"Dosya kaydedildi: {path.split('/')[-1]}")
-
 
 
 # ----------------------------------------------------------------------- #
