@@ -1,5 +1,6 @@
 import sys
 from typing import List
+import datetime
 
 import pandas as pd
 from PyQt5.QtCore import Qt
@@ -20,6 +21,11 @@ from PyQt5.QtWidgets import (
     QWidget,
     QMainWindow,
 )
+
+# Matplotlib imports for charting
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
 
 
 class ExcelProcessorApp(QMainWindow):
@@ -66,6 +72,7 @@ class ExcelProcessorApp(QMainWindow):
         self.excel_data = {}  # Stores pandas DataFrames for each sheet
         self.selected_file_path = ""  # Path of the currently selected Excel file
         self.sheet_names: List[str] = []  # Names of sheets in the loaded Excel file
+        self.chart_figure = None  # To store the matplotlib figure for saving
 
         self._build_style()  # Apply custom CSS styling
         self._build_pages()  # Construct the UI pages
@@ -107,6 +114,12 @@ class ExcelProcessorApp(QMainWindow):
                 font-weight: bold;
             }
             QLabel#filePathLabel { font-style: italic; color: #555; font-size: 13px; margin-top: 10px; } /* Styling for file path label */
+            QFrame#chartContainer {
+                background: #e0e0e0; /* Light grey to see the container - TEMPORARY FOR DEBUGGING */
+                border: 1px solid #ccc; /* TEMPORARY FOR DEBUGGING */
+                border-radius: 10px;
+                padding: 10px;
+            }
             """
         )
 
@@ -160,19 +173,51 @@ class ExcelProcessorApp(QMainWindow):
         hbox = QHBoxLayout()  # Layout for save and back buttons
         self.btn_save = QPushButton("Değişiklikleri Kaydet", clicked=self._save_excel)
         self.btn_back = QPushButton("Geri Dön", clicked=lambda: self.stacked_widget.setCurrentWidget(self.file_page))
+        # New: Button to open chart page
+        self.btn_show_chart = QPushButton("İş Tamamlanma Grafiği", clicked=self._open_chart_page)
         hbox.addStretch(1)
         hbox.addWidget(self.btn_save)
         hbox.addWidget(self.btn_back)
+        hbox.addWidget(self.btn_show_chart)  # Add chart button
         hbox.addStretch(1)
         tv.addLayout(hbox)
         tv.addSpacing(20)
 
         self.stacked_widget.addWidget(self.table_page)  # Add table page to stacked widget
 
+        # 3) Chart page -----------------------------------------------------
+        self.chart_page = QWidget()
+        chart_v_layout = QVBoxLayout(self.chart_page)
+        chart_v_layout.addStretch(1)  # Top stretch for vertical centering
+
+        chart_page_title = QLabel("İş Tamamlanma Grafiği", objectName="titleLabel", alignment=Qt.AlignCenter)
+        chart_v_layout.addWidget(chart_page_title)
+        chart_v_layout.addSpacing(15)
+
+        self.chart_container = QFrame(objectName="chartContainer")
+        self.chart_container.setMinimumHeight(460)  # Set minimum height for chart
+        chart_layout = QVBoxLayout(self.chart_container)
+        chart_layout.setAlignment(Qt.AlignCenter)  # Center the chart content within its container
+        # Removed alignment from here, letting the QFrame expand naturally within the QVBoxLayout
+        chart_v_layout.addWidget(self.chart_container)
+
+        chart_hbox = QHBoxLayout()
+        self.btn_chart_back = QPushButton("Geri Dön",
+                                          clicked=lambda: self.stacked_widget.setCurrentWidget(self.table_page))
+        self.btn_save_chart = QPushButton("Grafiği Kaydet", clicked=self._save_chart_as_image)
+        chart_hbox.addStretch(1)
+        chart_hbox.addWidget(self.btn_save_chart)
+        chart_hbox.addWidget(self.btn_chart_back)
+        chart_hbox.addStretch(1)
+        chart_v_layout.addLayout(chart_hbox)
+        chart_v_layout.addSpacing(20)
+        chart_v_layout.addStretch(1)  # Bottom stretch for vertical centering
+
+        self.stacked_widget.addWidget(self.chart_page)  # Add chart page to stacked widget
+
     # -------------------------------------------------------------------- #
     #                           File selection
-    # --------------------------------------------------------------------  #
-
+    # -------------------------------------------------------------------- #
     def _select_file(self):
         """Opens a file dialog for the user to select an Excel file."""
         # GetOpenFileName returns (filePath, filter), we only need filePath
@@ -190,7 +235,7 @@ class ExcelProcessorApp(QMainWindow):
             self.sheet_names = xls.sheet_names  # Get all sheet names
             # New: Check if at least 4 sheets are present
             if len(self.sheet_names) < 4:
-                raise ValueError("Seçilen Excel dosyasında en az 4 sayfa bulunmalıdır.")
+                raise ValueError("Seçilen Excel dosyasında en least 4 sayfa bulunmalıdır.")
             # Load the first four sheets into DataFrames, skipping the first row (index 0)
             # This ensures that the original Excel file's first row is not processed.
             self.excel_data = {
@@ -218,6 +263,14 @@ class ExcelProcessorApp(QMainWindow):
         self._populate_table()  # Fill the QTableWidget with processed data
         self._process_fsnkp_rows()  # Process FSNKP rows after initial population
         self.stacked_widget.setCurrentWidget(self.table_page)  # Switch to table page
+
+    def _open_chart_page(self):
+        """Switches to the chart view page and updates the chart."""
+        if not self.excel_data:
+            QMessageBox.warning(self, "Uyarı", "Lütfen önce bir Excel dosyası yükleyin ve tabloyu görüntüleyin.")
+            return
+        self._update_completion_chart()  # Update the chart before showing the page
+        self.stacked_widget.setCurrentWidget(self.chart_page)
 
     def _populate_table(self):
         """Populates the QTableWidget with data from the loaded Excel sheets,
@@ -350,11 +403,12 @@ class ExcelProcessorApp(QMainWindow):
             self._update_l_column(row)  # Recalculate L for the current row with K=0
             # Also update order quantities if K changes
             self._update_order_quantities(row, self.excel_data["s4"])
+            # Chart update is now handled when chart page is opened, or after all changes are done
             self._updating = False  # Reset updating flag
             return
 
         self._updating = True  # Set updating flag to prevent recursion
-        # Apply the new K value (multiplied by D column) to the changed cell and all cells below it in column K
+        # Apply the new K value (multiplied by D column) to the changed cell and all cells below it in the same column
         for r_idx in range(row, self.table.rowCount()):
             # Get the value from column D (index 3) for the current row
             d_val = self._to_float(self.table.item(r_idx, 3))
@@ -368,6 +422,7 @@ class ExcelProcessorApp(QMainWindow):
             self._update_l_column(r_idx)
             # Also update order quantities if K changes
             self._update_order_quantities(r_idx, self.excel_data["s4"])
+        # Chart update is now handled when chart page is opened, or after all changes are done
         self._updating = False  # Reset updating flag
 
     def _to_float(self, item: QTableWidgetItem) -> float:
@@ -503,6 +558,117 @@ class ExcelProcessorApp(QMainWindow):
 
         self._updating = False  # cellChanged sinyalini yeniden etkinleştirir
 
+    def _update_completion_chart(self):
+        """
+        'Durum' sütunundaki hücreleri sayar ve tamamlanma durumunu gösteren bir pasta grafiği oluşturur.
+        Ayrıca, en geç teslim tarihini ve Ü.Ağacı Sev değerini grafiğe ekler.
+        """
+        completed_count = 0
+        incomplete_count = 0
+        total_rows = self.table.rowCount()
+        latest_delivery_date = None
+        u_agaci_sev_value = ""
+
+        if total_rows > 0:
+            # Get Ü.Ağacı Sev value from the first row, first column
+            u_agaci_sev_item = self.table.item(0, 0)
+            if u_agaci_sev_item:
+                u_agaci_sev_value = u_agaci_sev_item.text()
+
+        for r_idx in range(total_rows):
+            durum_item = self.table.item(r_idx, 10)  # 'Durum' sütunu (index 10)
+            if durum_item and "#SİPARİŞ VER" in durum_item.text():
+                incomplete_count += 1
+            else:
+                completed_count += 1
+
+            # Find the latest delivery date
+            teslim_tarihi_item = self.table.item(r_idx, 13)  # 'Teslim Tarihi' sütunu (index 13)
+            if teslim_tarihi_item:
+                date_str = teslim_tarihi_item.text()
+                try:
+                    # Parse DD.MM.YYYY format
+                    current_date = datetime.datetime.strptime(date_str, '%d.%m.%Y').date()
+                    if latest_delivery_date is None or current_date > latest_delivery_date:
+                        latest_delivery_date = current_date
+                except ValueError:
+                    pass  # Ignore invalid date formats
+
+        # Clear existing chart from container
+        for i in reversed(range(self.chart_container.layout().count())):
+            widget_to_remove = self.chart_container.layout().itemAt(i).widget()
+            if widget_to_remove:
+                widget_to_remove.setParent(None)
+
+        if total_rows == 0:
+            no_data_label = QLabel("Grafik için veri yok.", alignment=Qt.AlignCenter)
+            self.chart_container.layout().addWidget(no_data_label)
+            self.chart_figure = None  # Clear the figure if no data
+            return
+
+        completed_percentage = (completed_count / total_rows) * 100
+        incomplete_percentage = (incomplete_count / total_rows) * 100
+
+        # Define a custom autopct function to handle zero percentages gracefully
+        def autopct_format(pct):
+            return ('%1.1f%%' % pct) if pct > 0 else ''
+
+        # Create a Matplotlib figure and axes
+        self.chart_figure = Figure(figsize=(7, 4.6), dpi=100)  # Set figure size for 700x460 pixels
+        ax = self.chart_figure.add_subplot(111)
+
+        # Updated colors: Blue for completed, Orange for incomplete
+        labels = ['Tamamlandı ({:.1f}%)'.format(completed_percentage),
+                  'Tamamlanmadı ({:.1f}%)'.format(incomplete_percentage)]
+        sizes = [completed_percentage, incomplete_percentage]
+        colors = ['#1f77b4', '#ff7f0e']  # Blue and Orange
+        explode = (0.05, 0)  # Slightly separate the 'completed' slice
+
+        ax.pie(sizes, explode=explode, labels=labels, colors=colors,
+               autopct=autopct_format, shadow=True, startangle=90,
+               textprops={'fontsize': 10, 'color': 'black', 'fontweight': 'bold'})  # Text properties for labels
+        ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+
+        # Set chart title with Ü.Ağacı Sev value
+        chart_title_text = f"{u_agaci_sev_value} İş Tamamlanma Durumu"
+        ax.set_title(chart_title_text, fontsize=16, color='#2c3e50', fontweight='bold')
+
+        # Add latest delivery date to the chart - positioned at bottom-right below title
+        if latest_delivery_date:
+            date_text = f"En Geç Teslim Tarihi: {latest_delivery_date.strftime('%d.%m.%Y')}"
+            # Position the date text at the bottom right, relative to the figure, not axes
+            # Adjusted y coordinate to be slightly higher (0.05 instead of 0.02) to ensure no overlap with the very bottom edge.
+            self.chart_figure.text(0.98, 0.05, date_text, transform=self.chart_figure.transFigure,
+                                   fontsize=10, color='#555555', ha='right', va='bottom', fontweight='bold')
+
+        # Adjust layout to prevent labels/title from overlapping
+        self.chart_figure.tight_layout()
+
+        # Embed the Matplotlib figure into a PyQt widget
+        # Added stretch=1 to ensure the canvas expands within its layout
+        canvas = FigureCanvas(self.chart_figure)
+        self.chart_container.layout().addWidget(canvas, stretch=1)
+        canvas.draw()
+
+    def _save_chart_as_image(self):
+        """Saves the generated pie chart as a JPEG/PNG image."""
+        if self.chart_figure is None:
+            QMessageBox.warning(self, "Uyarı", "Kaydedilecek bir grafik bulunamadı. Lütfen önce tabloyu görüntüleyin.")
+            return
+
+        # Get save file path from user
+        path, _ = QFileDialog.getSaveFileName(self, "Grafiği Kaydet", "iş_tamamlanma_grafiği.png",
+                                              "Görüntü Dosyaları (*.png *.jpg *.jpeg)")
+        if not path:
+            return
+
+        try:
+            # Save the figure with specified dimensions
+            self.chart_figure.savefig(path, dpi=100)  # dpi=100 with figsize=(7, 4.6) gives 700x460 pixels
+            QMessageBox.information(self, "Başarılı", f"Grafik kaydedildi: {path.split('/')[-1]}")
+        except Exception as e:
+            QMessageBox.critical(self, "Hata", f"Grafik kaydedilirken bir hata oluştu:\n{e}")
+
     # -------------------------------------------------------------------- #
     #                           Save to Excel
     # -------------------------------------------------------------------- #
@@ -532,4 +698,4 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)  # QApplication örneğini oluşturur
     window = ExcelProcessorApp()  # Ana uygulama penceresinin bir örneğini oluşturur
     window.show()  # Pencereyi gösterir
-    sys.exit(app.exec_())  # Uygulama olay döngüsünü başlatır
+    sys.exit(app.exec_())  # Uygulama olay döngüsünü başlat
