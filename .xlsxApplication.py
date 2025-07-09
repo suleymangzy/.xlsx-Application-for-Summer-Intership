@@ -289,6 +289,7 @@ class ExcelProcessorApp(QMainWindow):
             self._update_l_column(r)
 
             # Update "Verilen Sipariş Miktarı" and "Verilmesi Gereken Sipariş Miktarı" columns
+            # This call is now unconditional for each row
             self._update_order_quantities(r, df4)
 
             # New: Populate "Teslim Tarihi" column (table index 13)
@@ -421,25 +422,28 @@ class ExcelProcessorApp(QMainWindow):
 
         verilen_siparis_miktari = 0.0
         verilmesi_gereken_siparis_miktari = 0.0
+        durum_numeric_val = 0.0  # Initialize to 0.0
 
+        # Always try to get verilen_siparis_miktari if malzeme exists
+        if malzeme_item:
+            malzeme_val = malzeme_item.text()
+            # 4. sayfada 'Malzeme'ye (C sütunu, indeks 2) göre eşleşmeleri bulur
+            s4_matches = df4[df4[self.SHEET4_COLS["C"]] == malzeme_val]
+
+            if not s4_matches.empty:
+                # 4. sayfadaki 8. indeks sütunundaki (I sütunu) değerleri toplar
+                verilen_siparis_miktari = s4_matches[self.SHEET4_COLS["I"]].apply(self._to_float_series).sum()
+
+        # Calculate verilmesi_gereken_siparis_miktari only if "#SİPARİŞ VER" is present in Durum
         if durum_item and "#SİPARİŞ VER" in durum_item.text():
             try:
                 # 'Durum' değerinin sayısal kısmını çıkarır
                 durum_numeric_str = durum_item.text().split(" #SİPARİŞ VER")[0].replace(",", ".")
                 durum_numeric_val = float(durum_numeric_str)
             except (ValueError, AttributeError):
-                durum_numeric_val = 0.0
+                durum_numeric_val = 0.0  # Still default to 0 if parsing fails
 
-            if malzeme_item:
-                malzeme_val = malzeme_item.text()
-                # 4. sayfada 'Malzeme'ye (C sütunu, indeks 2) göre eşleşmeleri bulur
-                s4_matches = df4[df4[self.SHEET4_COLS["C"]] == malzeme_val]
-
-                if not s4_matches.empty:
-                    # 4. sayfadaki 8. indeks sütunundaki (I sütunu) değerleri toplar
-                    verilen_siparis_miktari = s4_matches[self.SHEET4_COLS["I"]].apply(self._to_float_series).sum()
-
-            # Yeni: 'Verilmesi Gereken Sipariş Miktarı'nı hesaplar
+            # 'Verilmesi Gereken Sipariş Miktarı'nı hesaplar
             # Durum sütunundaki değer ile Verilen Sipariş Miktarı'nı toplar
             remaining_needed = durum_numeric_val + verilen_siparis_miktari
 
