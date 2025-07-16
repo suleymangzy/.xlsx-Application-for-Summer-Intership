@@ -322,38 +322,36 @@ class ExcelProcessorApp(QMainWindow):
                 skip_next_data_row_after_header = False  # Bir sonraki yineleme için bayrağı sıfırla
                 continue  # Bu satırı atla
 
-            # Kural: B sütunundaki değer (Malzeme kodu) A sütunundaki blok koduyla aynıysa satırı kaldır.
-            malzeme_val_from_sheet1 = str(row[self.SHEET1_COLS["C"]])
-            if malzeme_val_from_sheet1 == active_kit_code_for_block:
-                continue  # Bu satırı atla, final_table_content'a ekleme
-
             # Buraya ulaşırsak, satır nihai tablo içeriğine eklenmelidir
             current_data_row = [""] * len(self.HEADER_LABELS)
 
             # A sütununa yüklenen excel dosyasında 1. sayfadaki 0. indeksli sütundaki değeri yaz
             current_data_row[0] = str(row[self.SHEET1_COLS["A"]])
 
-            current_data_row[1] = malzeme_val_from_sheet1  # Malzeme
+            current_data_row[1] = str(row[self.SHEET1_COLS["C"]])  # Malzeme
             current_data_row[2] = str(row[self.SHEET1_COLS["G"]])  # Açıklama
             current_data_row[3] = str(row[self.SHEET1_COLS["E"]])  # Miktar
 
             match_val = row[self.SHEET1_COLS["C"]]  # Sayfa 1 C sütunundaki eşleşme değeri
 
-            # Sayfa 2 eşleşmesi ve değer ataması (toplama kaldırıldı)
+            # Sayfa 2 eşleşmesi ve toplama
             s2_matches = df2[df2[self.COMMON_MATCH_COL["G"]] == match_val]
             if not s2_matches.empty:
                 current_data_row[4] = str(s2_matches.iloc[0][self.SHEET2_COLS["B"]])  # Depo 100
-                val_j_s2 = self._to_float_series(s2_matches.iloc[0][self.SHEET2_COLS["J"]])
-                current_data_row[5] = str(val_j_s2)  # Kullanılabilir Stok (Depo 100)
+                # Toplamı al
+                val_j_s2_sum = s2_matches[self.SHEET2_COLS["J"]].apply(self._to_float_series).sum()
+                current_data_row[5] = str(val_j_s2_sum)  # Kullanılabilir Stok (Depo 100)
 
-            # Sayfa 3 eşleşmesi ve değer ataması (toplama kaldırıldı)
+            # Sayfa 3 eşleşmesi ve toplama
             s3_matches = df3[df3[self.COMMON_MATCH_COL["G"]] == match_val]
             if not s3_matches.empty:
                 current_data_row[6] = str(s3_matches.iloc[0][self.SHEET3_COLS["B"]])  # Depo 110
-                val_j_s3 = self._to_float_series(s3_matches.iloc[0][self.SHEET3_COLS["J"]])
-                current_data_row[7] = str(val_j_s3)  # Kullanılabilir Stok (Depo 110)
-                val_k_s3 = self._to_float_series(s3_matches.iloc[0][self.SHEET3_COLS["K"]])
-                current_data_row[8] = str(val_k_s3)  # Kalite Stoğu
+                # Toplamı al
+                val_j_s3_sum = s3_matches[self.SHEET3_COLS["J"]].apply(self._to_float_series).sum()
+                current_data_row[7] = str(val_j_s3_sum)  # Kullanılabilir Stok (Depo 110)
+                # Toplamı al
+                val_k_s3_sum = s3_matches[self.SHEET3_COLS["K"]].apply(self._to_float_series).sum()
+                current_data_row[8] = str(val_k_s3_sum)  # Kalite Stoğu
 
             current_data_row[9] = ""
             current_data_row[10] = ""
@@ -488,7 +486,7 @@ class ExcelProcessorApp(QMainWindow):
         ve virgül ondalık ayırıcılarını işler."""
         try:
             if isinstance(value, str):
-                # Binlik ayırıcıları (varsa) kaldırır ve virgül ondalık ayırıcısını nokta ile değiştirir
+                # Binlik ayırıcıları (varsayılıyorsa) kaldırır ve virgül ondalık ayırıcısını nokta ile değiştirir
                 value = value.replace(".", "").replace(",", ".")
             return float(value)
         except (ValueError, TypeError):
@@ -631,15 +629,10 @@ class ExcelProcessorApp(QMainWindow):
         latest_delivery_date = None
         u_agaci_sev_value = ""
 
-        # Grafik başlığı için başlangıç Ü.Ağacı Sev değerini almak için ilk başlık olmayan satırı bul
-        first_data_row_idx = -1
-        for r_idx in range(total_rows):
-            if r_idx not in self.highlighted_rows:
-                first_data_row_idx = r_idx
-                break
-
-        if first_data_row_idx != -1:
-            u_agaci_sev_item = self.table.item(first_data_row_idx, 0)
+        # Grafik başlığı için en üst blok başlığının A sütunundaki değeri al
+        if self.highlighted_rows:
+            first_header_row_idx = self.highlighted_rows[0]
+            u_agaci_sev_item = self.table.item(first_header_row_idx, 0)
             if u_agaci_sev_item:
                 u_agaci_sev_value = u_agaci_sev_item.text()
 
