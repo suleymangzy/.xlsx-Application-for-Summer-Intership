@@ -712,7 +712,7 @@ class ExcelProcessorApp(QMainWindow):
         ax.axis('equal')  # Eşit en boy oranı, pastanın bir daire olarak çizilmesini sağlar.
 
         # Grafik başlığını Ü.Ağacı Sev değeriyle ayarla
-        chart_title_text = f"{u_agaci_sev_value} İş Tamamlanma Durumu"
+        chart_title_text = f"eİş Tamamlanma Durumu"
         ax.set_title(chart_title_text, fontsize=16, color='#2c3e50', fontweight='bold')
 
         # En geç teslim tarihini grafiğe ekle - başlığın altında sağ alt köşeye konumlandırıldı
