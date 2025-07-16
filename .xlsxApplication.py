@@ -83,13 +83,13 @@ class ExcelProcessorApp(QMainWindow):
     #                           UI Construction
     # -------------------------------------------------------------------- #
     def _build_style(self):
-        """Applies custom CSS styling to the application widgets."""
+        """Uygulama widget'larına özel CSS stilini uygular."""
         self.setStyleSheet(
             """
-            QMainWindow { background: #f0f2f5; } /* Light grey background for main window */
-            QWidget     { font-family: 'Segoe UI', sans-serif; font-size: 14px; } /* Default font for widgets */
-            QLabel#titleLabel { font-size: 28px; font-weight: bold; color: #2c3e50; margin-bottom: 20px; } /* Styling for title labels */
-            QPushButton { /* Styling for buttons */
+            QMainWindow { background: #f0f2f5; } /* Ana pencere için açık gri arka plan */
+            QWidget     { font-family: 'Segoe UI', sans-serif; font-size: 14px; } /* Widget'lar için varsayılan yazı tipi */
+            QLabel#titleLabel { font-size: 28px; font-weight: bold; color: #2c3e50; margin-bottom: 20px; } /* Başlık etiketleri için stil */
+            QPushButton { /* Butonlar için stil */
                 background: #3498db;
                 color: white;
                 border-radius: 8px;
@@ -98,27 +98,27 @@ class ExcelProcessorApp(QMainWindow):
                 font-weight: bold;
                 border: none;
             }
-            QPushButton:hover    { background: #2980b9; } /* Darker blue on hover */
-            QPushButton:disabled { background: #cccccc; color: #666666; } /* Greyed out for disabled buttons */
-            QFrame#card { background: white; border-radius: 10px; padding: 30px; } /* Styling for card-like frames */
-            QTableWidget         { /* Styling for the table widget */
+            QPushButton:hover    { background: #2980b9; } /* Üzerine gelindiğinde daha koyu mavi */
+            QPushButton:disabled { background: #cccccc; color: #666666; } /* Devre dışı bırakılan butonlar için gri tonları */
+            QFrame#card { background: white; border-radius: 10px; padding: 30px; } /* Kart benzeri çerçeveler için stil */
+            QTableWidget         { /* Tablo widget'ı için stil */
                 background: white;
                 border: 1px solid #dcdcdc;
                 gridline-color: #f0f0f0;
                 selection-background-color: #aed6f1;
                 font-size: 13px;
             }
-            QHeaderView::section { /* Styling for table headers */
+            QHeaderView::section { /* Tablo başlıkları için stil */
                 background: #e9ecef;
                 color: #495057;
                 padding: 8px;
                 border: 1px solid #dcdcdc;
                 font-weight: bold;
             }
-            QLabel#filePathLabel { font-style: italic; color: #555; font-size: 13px; margin-top: 10px; } /* Styling for file path label */
+            QLabel#filePathLabel { font-style: italic; color: #555; font-size: 13px; margin-top: 10px; } /* Dosya yolu etiketi için stil */
             QFrame#chartContainer {
-                background: #e0e0e0; /* Light grey to see the container - TEMPORARY FOR DEBUGGING */
-                border: 1px solid #ccc; /* TEMPORARY FOR DEBUGGING */
+                background: #e0e0e0; /* Grafik kapsayıcısı için açık gri */
+                border: 1px solid #ccc; /* Grafik kapsayıcısı için kenarlık */
                 border-radius: 10px;
                 padding: 10px;
             }
@@ -126,17 +126,17 @@ class ExcelProcessorApp(QMainWindow):
         )
 
     def _build_pages(self):
-        """Constructs the two main pages of the application: file selection and table view."""
+        """Uygulamanın iki ana sayfasını (dosya seçimi ve tablo görünümü) oluşturur."""
         self.stacked_widget = QStackedWidget(self)
         self.setCentralWidget(self.stacked_widget)
 
-        # 1) File‑select page ------------------------------------------------
+        # 1) Dosya seçimi sayfası ------------------------------------------------
         self.file_page = QWidget()
-        main_v = QVBoxLayout(self.file_page)  # Main layout for the file selection page
+        main_v = QVBoxLayout(self.file_page)  # Dosya seçimi sayfası için ana düzen
 
-        card = QFrame(objectName="card")  # Card frame for buttons and labels
-        card.setFixedSize(500, 350)  # Fixed size for the card
-        card_v = QVBoxLayout(card)  # Layout for the card content
+        card = QFrame(objectName="card")  # Butonlar ve etiketler için kart çerçevesi
+        card.setFixedSize(500, 350)  # Kart için sabit boyut
+        card_v = QVBoxLayout(card)  # Kart içeriği için düzen
 
         ttl = QLabel("Excel Dosyası Seçin", objectName="titleLabel", alignment=Qt.AlignCenter)
         card_v.addWidget(ttl)
@@ -152,15 +152,15 @@ class ExcelProcessorApp(QMainWindow):
         self.btn_open = QPushButton("Uyarlanmış Dosyayı Görüntüle", enabled=False, clicked=self._open_table_page)
         card_v.addWidget(self.btn_open)
 
-        main_v.addStretch(1)  # Push content to center
+        main_v.addStretch(1)  # İçeriği merkeze it
         main_v.addWidget(card, alignment=Qt.AlignCenter)
         main_v.addStretch(1)
 
-        self.stacked_widget.addWidget(self.file_page)  # Add file page to stacked widget
+        self.stacked_widget.addWidget(self.file_page)  # Dosya sayfasını yığılmış widget'a ekle
 
-        # 2) Table page -----------------------------------------------------
+        # 2) Tablo sayfası -----------------------------------------------------
         self.table_page = QWidget()
-        tv = QVBoxLayout(self.table_page)  # Main layout for the table page
+        tv = QVBoxLayout(self.table_page)  # Tablo sayfası için ana düzen
 
         lbl2 = QLabel("Uyarlanmış Excel Verileri", objectName="titleLabel", alignment=Qt.AlignCenter)
         tv.addWidget(lbl2)
@@ -168,39 +168,38 @@ class ExcelProcessorApp(QMainWindow):
 
         self.table = QTableWidget(
             editTriggers=QTableWidget.DoubleClicked | QTableWidget.AnyKeyPressed,
-            alternatingRowColors=True  # Zebra striping for rows
+            alternatingRowColors=True  # Satırlar için zebra şeritleri
         )
         tv.addWidget(self.table)
 
-        hbox = QHBoxLayout()  # Layout for save and back buttons
+        hbox = QHBoxLayout()  # Kaydet ve geri butonları için düzen
         self.btn_save = QPushButton("Değişiklikleri Kaydet", clicked=self._save_excel)
         self.btn_back = QPushButton("Geri Dön", clicked=lambda: self.stacked_widget.setCurrentWidget(self.file_page))
-        # New: Button to open chart page
+        # Yeni: Grafik sayfasını açma butonu
         self.btn_show_chart = QPushButton("İş Tamamlanma Grafiği", clicked=self._open_chart_page)
         hbox.addStretch(1)
         hbox.addWidget(self.btn_save)
         hbox.addWidget(self.btn_back)
-        hbox.addWidget(self.btn_show_chart)  # Add chart button
+        hbox.addWidget(self.btn_show_chart)  # Grafik butonunu ekle
         hbox.addStretch(1)
         tv.addLayout(hbox)
         tv.addSpacing(20)
 
-        self.stacked_widget.addWidget(self.table_page)  # Add table page to stacked widget
+        self.stacked_widget.addWidget(self.table_page)  # Tablo sayfasını yığılmış widget'a ekle
 
-        # 3) Chart page -----------------------------------------------------
+        # 3) Grafik sayfası -----------------------------------------------------
         self.chart_page = QWidget()
         chart_v_layout = QVBoxLayout(self.chart_page)
-        chart_v_layout.addStretch(1)  # Top stretch for vertical centering
+        chart_v_layout.addStretch(1)  # Dikey ortalama için üst boşluk
 
         chart_page_title = QLabel("İş Tamamlanma Grafiği", objectName="titleLabel", alignment=Qt.AlignCenter)
         chart_v_layout.addWidget(chart_page_title)
         chart_v_layout.addSpacing(15)
 
         self.chart_container = QFrame(objectName="chartContainer")
-        self.chart_container.setMinimumHeight(460)  # Set minimum height for chart
+        self.chart_container.setMinimumHeight(460)  # Grafik için minimum yükseklik ayarla
         chart_layout = QVBoxLayout(self.chart_container)
-        chart_layout.setAlignment(Qt.AlignCenter)  # Center the chart content within its container
-        # Removed alignment from here, letting the QFrame expand naturally within the QVBoxLayout
+        chart_layout.setAlignment(Qt.AlignCenter)  # Grafik içeriğini kapsayıcısında ortala
         chart_v_layout.addWidget(self.chart_container)
 
         chart_hbox = QHBoxLayout()
@@ -213,188 +212,206 @@ class ExcelProcessorApp(QMainWindow):
         chart_hbox.addStretch(1)
         chart_v_layout.addLayout(chart_hbox)
         chart_v_layout.addSpacing(20)
-        chart_v_layout.addStretch(1)  # Bottom stretch for vertical centering
+        chart_v_layout.addStretch(1)  # Dikey ortalama için alt boşluk
 
-        self.stacked_widget.addWidget(self.chart_page)  # Add chart page to stacked widget
+        self.stacked_widget.addWidget(self.chart_page)  # Grafik sayfasını yığılmış widget'a ekle
 
     # -------------------------------------------------------------------- #
-    #                           File selection
+    #                           Dosya Seçimi
     # -------------------------------------------------------------------- #
     def _select_file(self):
-        """Opens a file dialog for the user to select an Excel file."""
-        # GetOpenFileName returns (filePath, filter), we only need filePath
+        """Kullanıcının bir Excel dosyası seçmesi için dosya iletişim kutusunu açar."""
+        # GetOpenFileName (filePath, filter) döndürür, sadece filePath'a ihtiyacımız var
         path, _ = QFileDialog.getOpenFileName(self, "Excel Dosyası Seç", "", "Excel Dosyaları (*.xlsx)")
-        if not path:  # If no file is selected, return
+        if not path:  # Dosya seçilmezse geri dön
             return
         self.selected_file_path = path
-        self.lbl_file.setText(f"Seçilen Dosya: {path.split('/')[-1]}")  # Display selected file name
-        self._load_excel()  # Attempt to load the selected Excel file
+        self.lbl_file.setText(f"Seçilen Dosya: {path.split('/')[-1]}")  # Seçilen dosya adını göster
+        self._load_excel()  # Seçilen Excel dosyasını yüklemeyi dene
 
     def _load_excel(self):
-        """Loads data from the selected Excel file into pandas DataFrames."""
+        """Seçilen Excel dosyasından verileri pandas DataFrame'lerine yükler."""
         try:
-            xls = pd.ExcelFile(self.selected_file_path)  # Create an ExcelFile object
-            self.sheet_names = xls.sheet_names  # Get all sheet names
-            # New: Check if at least 4 sheets are present
+            xls = pd.ExcelFile(self.selected_file_path)  # Bir ExcelFile nesnesi oluştur
+            self.sheet_names = xls.sheet_names  # Tüm sayfa adlarını al
+            # Yeni: En az 4 sayfa olup olmadığını kontrol et
             if len(self.sheet_names) < 4:
-                raise ValueError("Seçilen Excel dosyasında en least 4 sayfa bulunmalıdır.")
-            # Load the first four sheets into DataFrames, skipping the first row (index 0)
-            # This ensures that the original Excel file's first row is not processed.
+                raise ValueError("Seçilen Excel dosyasında en az 4 sayfa bulunmalıdır.")
+            # İlk dört sayfayı DataFrame'lere yükle, ilk satırı (indeks 0) atla
+            # Bu, orijinal Excel dosyasının ilk satırının işlenmemesini sağlar.
             self.excel_data = {
                 "s1": pd.read_excel(xls, sheet_name=self.sheet_names[0], header=None, skiprows=[0]),
                 "s2": pd.read_excel(xls, sheet_name=self.sheet_names[1], header=None, skiprows=[0]),
                 "s3": pd.read_excel(xls, sheet_name=self.sheet_names[2], header=None, skiprows=[0]),
                 "s4": pd.read_excel(xls, sheet_name=self.sheet_names[3], header=None, skiprows=[0]),
-                # New: Load 4th sheet
             }
         except Exception as e:
             QMessageBox.critical(self, "Hata", f"Excel dosyası yüklenirken bir hata oluştu:\n{e}")
-            self.btn_open.setEnabled(False)  # Disable open button on error
+            self.btn_open.setEnabled(False)  # Hata durumunda aç butonunu devre dışı bırak
             return
 
         QMessageBox.information(self, "Başarılı", "Excel dosyası başarıyla yüklendi.")
-        self.btn_open.setEnabled(True)  # Enable open button on successful load
+        self.btn_open.setEnabled(True)  # Başarılı yüklemede aç butonunu etkinleştir
 
     # -------------------------------------------------------------------- #
-    #                           Table population
+    #                           Tablo Doldurma
     # -------------------------------------------------------------------- #
     def _open_table_page(self):
-        """Switches to the table view page and populates the table."""
-        if not self.excel_data:  # Ensure data is loaded
+        """Tablo görünümü sayfasına geçer ve tabloyu doldurur."""
+        if not self.excel_data:  # Verilerin yüklendiğinden emin ol
             return
-        self._populate_table()  # Fill the QTableWidget with processed data
-        self._process_fsnkp_rows()  # Process FSNKP rows after initial population
-        self.stacked_widget.setCurrentWidget(self.table_page)  # Switch to table page
+        self._populate_table()  # QTableWidget'ı işlenmiş verilerle doldur
+        self._process_fsnkp_rows()  # İlk doldurmadan sonra FSNKP satırlarını işle
+        self.stacked_widget.setCurrentWidget(self.table_page)  # Tablo sayfasına geç
 
     def _open_chart_page(self):
-        """Switches to the chart view page and updates the chart."""
+        """Grafik görünümü sayfasına geçer ve grafiği günceller."""
         if not self.excel_data:
             QMessageBox.warning(self, "Uyarı", "Lütfen önce bir Excel dosyası yükleyin ve tabloyu görüntüleyin.")
             return
-        self._update_completion_chart()  # Update the chart before showing the page
+        self._update_completion_chart()  # Sayfayı göstermeden önce grafiği güncelle
         self.stacked_widget.setCurrentWidget(self.chart_page)
 
     def _populate_table(self):
-        """Populates the QTableWidget with data from the loaded Excel sheets,
-        performing filtering, deduplication, and aggregation, including dynamic block headers."""
+        """Yüklenen Excel sayfalarındaki verileri QTableWidget'a doldurur,
+        filtreleme, tekilleştirme ve toplama işlemleri yapar, dinamik blok başlıkları da dahil."""
         df1 = self.excel_data["s1"]
         df2 = self.excel_data["s2"]
         df3 = self.excel_data["s3"]
         df4 = self.excel_data["s4"]
 
-        # 1) Filter + deduplicate rows in Sheet‑1
-        df1 = df1[
-            df1[self.SHEET1_COLS["C"]].notna() & df1[self.SHEET1_COLS["A"]].notna()
-            ].copy()
-        df1.drop_duplicates(subset=self.SHEET1_COLS["C"], keep="first", inplace=True)
+        # Kullanıcının isteği üzerine df1'deki tüm filtreleme ve tekilleştirme kaldırıldı.
+        # df1 = df1[df1[self.SHEET1_COLS["C"]].notna() & df1[self.SHEET1_COLS["A"]].notna()].copy()
+        # df1.drop_duplicates(subset=self.SHEET1_COLS["C"], keep="first", inplace=True)
+        # df1 = df1[df1[self.SHEET1_COLS["C"]].astype(str).str.count('-') < 3].copy()
 
-        # Filter rows where 'Malzeme' column (original index 2) has 3 or more hyphens
-        # Convert to string to use .str methods, then count occurrences of '-'
-        df1 = df1[df1[self.SHEET1_COLS["C"]].astype(str).str.count('-') < 3].copy()
-
-        # Prepare for dynamic table content
+        # Dinamik tablo içeriği için hazırla
         final_table_content = []
-        self.highlighted_rows = []  # Reset highlighted rows for current population
-        prev_u_agaci_sev = None
-        highlight_color_brush = QBrush(QColor("#FFCCCC"))  # Lighter red for highlighting
+        self.highlighted_rows = []  # Mevcut doldurma için vurgulanan satırları sıfırla
 
-        # Define the actual column headers that will appear in the inserted rows
-        # The first element will be the "Ü.Ağacı Sev" value, followed by these headers
-        internal_column_headers = self.HEADER_LABELS[1:]  # All headers except "Ü.Ağacı Sev"
+        # Mevcut blok için "####-####-####" kit kodunu tutar
+        active_kit_code_for_block = None
+        # Son blok başlığından bu yana işlenen veri satırı sayısını takip eder
+        data_rows_in_current_block = 0
 
-        # Iterate over rows of filtered Sheet 1
-        data_rows_in_current_block = 0  # Counter for data rows within the current 'Ü.Ağacı Sev' block
+        highlight_color_brush = QBrush(QColor("#FFCCCC"))  # Vurgulama için açık kırmızı
 
+        # Eklenen satırlarda görünecek gerçek sütun başlıklarını tanımla.
+        # İlk öğe "Ü.Ağacı Sev" değeri olacak, ardından diğer başlıklar gelecek.
+        internal_column_headers = self.HEADER_LABELS[1:]  # "Ü.Ağacı Sev" hariç tüm başlıklar
+
+        # Filtrelenmiş Sayfa 1'in satırları üzerinde yinele
         for r_original_idx, row in enumerate(df1.itertuples(index=False)):
-            current_u_agaci_sev = str(row[self.SHEET1_COLS["A"]])
+            # Sayfa 1'in 'A' sütunundaki ham değeri al.
+            # Bu sütun, kaynak sayfada bir bloğun yalnızca ilk satırı için kit kodunu içerir,
+            # ardından o bloktaki sonraki satırlar için sayılar (0, 1, 2...) içerir.
+            raw_val_from_sheet1_A = str(row[self.SHEET1_COLS["A"]])
 
-            # Check if 'Ü.Ağacı Sev' value has changed from the previous row
-            # Or if it's the very first row, we still want to add a header for the first block
-            if prev_u_agaci_sev is None or current_u_agaci_sev != prev_u_agaci_sev:
-                # Add the block header row
-                # The first cell (A column) will be the 'Ü.Ağacı Sev' value
-                # The rest of the cells will be the standard HEADER_LABELS (excluding the first one)
-                block_header_row_content = [current_u_agaci_sev] + internal_column_headers
+            # Bu ham değerin bir kit kodu olup olmadığını kontrol et (tire içeriyor mu ve harf içeriyor mu?)
+            is_kit_code = "-" in raw_val_from_sheet1_A and any(char.isalpha() for char in raw_val_from_sheet1_A)
+
+            # Yeni bir blok başlığı eklememiz gerekip gerekmediğini belirle.
+            # Yeni bir blok şu durumlarda başlar:
+            # 1. Tüm DataFrame'in ilk satırıysa.
+            # 2. Sayfa 1'in 'A' sütunundaki değer geçerli bir kit koduysa VE şu anda aktif olan kit kodundan farklıysa.
+            add_new_block_header = False
+            if r_original_idx == 0:
+                add_new_block_header = True
+            elif is_kit_code and (
+                    active_kit_code_for_block is None or raw_val_from_sheet1_A != active_kit_code_for_block):
+                add_new_block_header = True
+
+            if add_new_block_header:
+                active_kit_code_for_block = raw_val_from_sheet1_A  # Bu yeni blok için aktif kit kodunu güncelle
+
+                # Blok başlık satırını ekle
+                # İlk hücre (A sütunu) 'Ü.Ağacı Sev' değeri (kit kodu) olacak
+                # Diğer hücreler standart HEADER_LABELS (ilki hariç) olacak
+                block_header_row_content = [active_kit_code_for_block] + internal_column_headers
                 final_table_content.append(block_header_row_content)
-                self.highlighted_rows.append(len(final_table_content) - 1)  # Mark this as a header row
-                data_rows_in_current_block = 0  # Reset data row counter for new block
+                self.highlighted_rows.append(len(final_table_content) - 1)  # Bunu bir başlık satırı olarak işaretle
+                data_rows_in_current_block = 0  # Yeni blok için sayacı sıfırla
 
-            # Process the actual data row
-            # Only add the data row if it's the 1st (index 0), 4th (index 3), 5th (index 4), etc. data row in the block
-            # (i.e., not the 2nd or 3rd data row, which are indices 1 and 2)
+            # Gerçek veri satırını işle
+            # Sadece bloktaki 1. (indeks 0), 4. (indeks 3), 5. (indeks 4) vb. veri satırı ise ekle
+            # (yani 2. veya 3. veri satırları değil, bunlar indeks 1 ve 2'dir)
             if data_rows_in_current_block == 0 or data_rows_in_current_block >= 3:
-                current_data_row = [""] * len(self.HEADER_LABELS)  # Initialize with empty strings
+                current_data_row = [""] * len(self.HEADER_LABELS)  # Boş dizelerle başlat
 
-                # Populate Sheet‑1 cols
-                current_data_row[0] = str(row[self.SHEET1_COLS["A"]])  # Ü.Ağacı Sev
+                # Sayfa 1 sütunlarını doldur
+                # Mevcut bloktaki tüm veri satırları için A sütunu için her zaman active_kit_code_for_block'u kullan
+                current_data_row[0] = active_kit_code_for_block
                 current_data_row[1] = str(row[self.SHEET1_COLS["C"]])  # Malzeme
                 current_data_row[2] = str(row[self.SHEET1_COLS["G"]])  # Açıklama
                 current_data_row[3] = str(row[self.SHEET1_COLS["E"]])  # Miktar
 
-                match_val = row[self.SHEET1_COLS["C"]]  # Value from Sheet 1 column C for matching
+                match_val = row[self.SHEET1_COLS["C"]]  # Sayfa 1 C sütunundaki eşleşme değeri
 
-                # Sheet‑2 match and aggregation
+                # Sayfa 2 eşleşmesi ve toplama (kaldırıldı, ilk eşleşen değer alınıyor)
                 s2_matches = df2[df2[self.COMMON_MATCH_COL["G"]] == match_val]
                 if not s2_matches.empty:
                     current_data_row[4] = str(s2_matches.iloc[0][self.SHEET2_COLS["B"]])  # Depo 100
-                    sum_j_s2 = s2_matches[self.SHEET2_COLS["J"]].apply(self._to_float_series).sum()
-                    current_data_row[5] = str(sum_j_s2)  # Kullanılabilir Stok (Depo 100)
+                    # Toplama kaldırıldı, ilk eşleşen satırdan değer alınıyor
+                    val_j_s2 = self._to_float_series(s2_matches.iloc[0][self.SHEET2_COLS["J"]])
+                    current_data_row[5] = str(val_j_s2)  # Kullanılabilir Stok (Depo 100)
 
-                # Sheet‑3 match and aggregation
+                # Sayfa 3 eşleşmesi ve toplama (kaldırıldı, ilk eşleşen değer alınıyor)
                 s3_matches = df3[df3[self.COMMON_MATCH_COL["G"]] == match_val]
                 if not s3_matches.empty:
                     current_data_row[6] = str(s3_matches.iloc[0][self.SHEET3_COLS["B"]])  # Depo 110
-                    sum_j_s3 = s3_matches[self.SHEET3_COLS["J"]].apply(self._to_float_series).sum()
-                    current_data_row[7] = str(sum_j_s3)  # Kullanılabilir Stok (Depo 110)
-                    sum_k_s3 = s3_matches[self.SHEET3_COLS["K"]].apply(self._to_float_series).sum()
-                    current_data_row[8] = str(sum_k_s3)  # Kalite Stoğu
+                    # Toplama kaldırıldı, ilk eşleşen satırdan değer alınıyor
+                    val_j_s3 = self._to_float_series(s3_matches.iloc[0][self.SHEET3_COLS["J"]])
+                    current_data_row[7] = str(val_j_s3)  # Kullanılabilir Stok (Depo 110)
+                    # Toplama kaldırıldı, ilk eşleşen satırdan değer alınıyor
+                    val_k_s3 = self._to_float_series(s3_matches.iloc[0][self.SHEET3_COLS["K"]])
+                    current_data_row[8] = str(val_k_s3)  # Kalite Stoğu
 
-                # K (İhtiyaç) column (table index 9) initially empty - will be updated by cellChanged
+                # K (İhtiyaç) sütunu (tablo indeks 9) başlangıçta boş - hücre değiştiğinde güncellenecek
                 current_data_row[9] = ""
 
-                # L (Durum) column (table index 10) initial calculation (K assumed 0)
-                # This will be calculated after populating the table to ensure all values are present
+                # L (Durum) sütunu (tablo indeks 10) başlangıç hesaplaması (K 0 kabul edildi)
+                # Bu, tüm değerlerin mevcut olduğundan emin olmak için tablo doldurulduktan sonra hesaplanacak
                 current_data_row[10] = ""
 
-                # Order quantities and delivery date - will be updated after populating the table
+                # Sipariş miktarları ve teslim tarihi - tablo doldurulduktan sonra güncellenecek
                 current_data_row[11] = ""  # Verilen Sipariş Miktarı
                 current_data_row[12] = ""  # Verilmesi Gereken Sipariş Miktarı
                 current_data_row[13] = ""  # Teslim Tarihi
 
                 final_table_content.append(current_data_row)
 
-            data_rows_in_current_block += 1  # Always increment this for each original data row from df1
-            prev_u_agaci_sev = current_u_agaci_sev
+            data_rows_in_current_block += 1  # Her orijinal df1 veri satırı için bunu her zaman artır
 
-        # Set table dimensions
-        self.table.setColumnCount(len(self.HEADER_LABELS))  # Still use original HEADER_LABELS length for columns
+        # Tablo boyutlarını ayarla
+        self.table.setColumnCount(
+            len(self.HEADER_LABELS))  # Sütunlar için hala orijinal HEADER_LABELS uzunluğunu kullan
         self.table.setRowCount(len(final_table_content))
-        # Clear default horizontal headers as we are inserting them as rows
+        # Başlıkları satır olarak eklediğimiz için varsayılan yatay başlıkları temizle
         self.table.setHorizontalHeaderLabels([""] * len(self.HEADER_LABELS))
 
-        # Populate QTableWidget and apply highlighting
+        # QTableWidget'ı doldur ve vurgulama uygula
         for r_idx, row_data in enumerate(final_table_content):
             for c_idx, cell_value in enumerate(row_data):
                 item = QTableWidgetItem(str(cell_value))
                 if r_idx in self.highlighted_rows:
                     item.setBackground(highlight_color_brush)
-                    # Make header rows non-editable
+                    # Başlık satırlarını düzenlenemez yap
                     item.setFlags(item.flags() ^ Qt.ItemIsEditable)
-                elif c_idx != 9:  # For data rows, make all cells non-editable except 'İhtiyaç' (index 9)
+                elif c_idx != 9:  # Veri satırları için, 'İhtiyaç' (indeks 9) hariç tüm hücreleri düzenlenemez yap
                     item.setFlags(item.flags() ^ Qt.ItemIsEditable)
                 self.table.setItem(r_idx, c_idx, item)
 
-        # After populating, iterate again to calculate 'Durum' and order quantities
-        # This is necessary because 'İhtiyaç' might be empty initially and needs D column for calculation
-        # And order quantities depend on 'Durum'
+        # Doldurmadan sonra, 'Durum' ve sipariş miktarlarını hesaplamak için tekrar yinele
+        # Bu, 'İhtiyaç' başlangıçta boş olabileceğinden ve hesaplama için D sütununa ihtiyaç duyulduğundan gereklidir
+        # Ve sipariş miktarları 'Durum'a bağlıdır
         for r_idx in range(self.table.rowCount()):
-            # Skip header rows for these calculations
+            # Bu hesaplamalar için başlık satırlarını atla
             if r_idx in self.highlighted_rows:
                 continue
             self._update_l_column(r_idx)
             self._update_order_quantities(r_idx, df4)
-            # Populate "Teslim Tarihi" column (table index 13) for data rows
-            malzeme_item = self.table.item(r_idx, 1)  # Malzeme column for matching
+            # Veri satırları için "Teslim Tarihi" sütununu (tablo indeks 13) doldur
+            malzeme_item = self.table.item(r_idx, 1)  # Eşleşme için Malzeme sütunu
             if malzeme_item:
                 malzeme_val = malzeme_item.text()
                 teslim_tarihi_val = ""
@@ -414,7 +431,7 @@ class ExcelProcessorApp(QMainWindow):
                     self.table.setItem(r_idx, 13, item_teslim_tarihi)
                 item_teslim_tarihi.setText(teslim_tarihi_val)
 
-        # 4) Resize + connect once
+        # 4) Boyutlandırma + bir kez bağla
         self.table.resizeColumnsToContents()
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.table.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
@@ -429,55 +446,55 @@ class ExcelProcessorApp(QMainWindow):
         self._cell_connected = True
 
     # -------------------------------------------------------------------- #
-    #                        Cell change handlers
+    #                        Hücre Değişikliği İşleyicileri
     # -------------------------------------------------------------------- #
     def _cell_changed(self, row: int, col: int):
-        """Handles changes in table cells, specifically for the 'İhtiyaç' (K) column.
-        Propagates the entered value multiplied by column D to all cells below in the same column."""
-        # If an update is already in progress or the changed column is not 'K' (index 9), return
-        # Also, ensure we are not trying to edit a highlighted header row
+        """Tablo hücrelerindeki değişiklikleri, özellikle 'İhtiyaç' (K) sütunu için işler.
+        Girilen değeri D sütunuyla çarparak aynı sütundaki tüm alt hücrelere yayar."""
+        # Bir güncelleme zaten devam ediyorsa veya değişen sütun 'K' (indeks 9) değilse geri dön
+        # Ayrıca, vurgulanmış bir başlık satırını düzenlemeye çalışmadığımızdan emin ol
         if self._updating or col != 9 or row in self.highlighted_rows:
             return
 
         try:
-            # Get the text from the changed cell, replace comma with dot for float conversion
+            # Değişen hücreden metni al, ondalık dönüşüm için virgülü noktayla değiştir
             k_raw = self.table.item(row, col).text().replace(",", ".")
-            k_input_value = float(k_raw)  # Convert to float
+            k_input_value = float(k_raw)  # Float'a dönüştür
         except (ValueError, AttributeError):
-            # If the input is not a valid number, clear the cell and recalculate L
-            self._updating = True  # Set updating flag to prevent recursion
-            self.table.setItem(row, col, QTableWidgetItem(""))  # Clear the invalid input
-            self._update_l_column(row)  # Recalculate L for the current row with K=0
-            # Also update order quantities if K changes
+            # Giriş geçerli bir sayı değilse, hücreyi temizle ve L'yi yeniden hesapla
+            self._updating = True  # Özyinelemeyi önlemek için güncelleme bayrağını ayarla
+            self.table.setItem(row, col, QTableWidgetItem(""))  # Geçersiz girişi temizle
+            self._update_l_column(row)  # K=0 ile mevcut satır için L'yi yeniden hesapla
+            # K değişirse sipariş miktarlarını da güncelle
             self._update_order_quantities(row, self.excel_data["s4"])
-            # Chart update is now handled when chart page is opened, or after all changes are done
-            self._updating = False  # Reset updating flag
+            # Grafik güncelleme artık grafik sayfası açıldığında veya tüm değişiklikler yapıldıktan sonra işlenir
+            self._updating = False  # Güncelleme bayrağını sıfırla
             return
 
-        self._updating = True  # Set updating flag to prevent recursion
-        # Apply the new K value (multiplied by D column) to the changed cell and all cells below it in the same column
+        self._updating = True  # Özyinelemeyi önlemek için güncelleme bayrağını ayarla
+        # Yeni K değerini (D sütunuyla çarpılarak) değişen hücreye ve aynı sütundaki tüm alt hücrelere uygula
         for r_idx in range(row, self.table.rowCount()):
-            # Skip highlighted header rows when propagating changes
+            # Değişiklikleri yayarken vurgulanmış başlık satırlarını atla
             if r_idx in self.highlighted_rows:
                 continue
 
-            # Get the value from column D (index 3) for the current row
+            # Mevcut satır için D sütunundaki değeri al (indeks 3)
             d_val = self._to_float(self.table.item(r_idx, 3))
 
-            # Calculate the new 'İhtiyaç' value by multiplying D column value with the user's input
+            # Kullanıcının girişiyle D sütunu değerini çarparak yeni 'İhtiyaç' değerini hesapla
             calculated_k_value = d_val * k_input_value
 
-            # Set the K column item for the current row to the calculated value
+            # Mevcut satır için K sütunu öğesini hesaplanan değere ayarla
             self.table.setItem(r_idx, 9, QTableWidgetItem(str(calculated_k_value)))
-            # Recalculate and update the L column for the current row based on the new K value
+            # Yeni K değerine göre mevcut satır için L sütununu yeniden hesapla ve güncelle
             self._update_l_column(r_idx)
-            # Also update order quantities if K changes
+            # K değişirse sipariş miktarlarını da güncelle
             self._update_order_quantities(r_idx, self.excel_data["s4"])
-        # Chart update is now handled when chart page is opened, or after all changes are done
-        self._updating = False  # Reset updating flag
+        # Grafik güncelleme artık grafik sayfası açıldığında veya tüm değişiklikler yapıldıktan sonra işlenir
+        self._updating = False  # Güncelleme bayrağını sıfırla
 
     def _to_float(self, item: QTableWidgetItem) -> float:
-        """Converts the text of a QTableWidgetItem to a float, handling commas and empty strings."""
+        """QTableWidgetItem'ın metnini float'a dönüştürür, virgülleri ve boş dizeleri işler."""
         try:
             if item is None or item.text() == "":
                 return 0.0
@@ -486,106 +503,106 @@ class ExcelProcessorApp(QMainWindow):
             return 0.0
 
     def _to_float_series(self, value) -> float:
-        """Converts a value in a Pandas Series to a float, handling non-numeric values
-        and comma decimal separators."""
+        """Pandas Serisindeki bir değeri float'a dönüştürür, sayısal olmayan değerleri
+        ve virgül ondalık ayırıcılarını işler."""
         try:
             if isinstance(value, str):
-                # Removes thousand separators (if any) and replaces comma decimal separator with dot
+                # Binlik ayırıcıları (varsa) kaldırır ve virgül ondalık ayırıcısını nokta ile değiştirir
                 value = value.replace(".", "").replace(",", ".")
             return float(value)
         except (ValueError, TypeError):
             return 0.0
 
     def _update_l_column(self, row: int):
-        """Calculates and updates the 'Durum' (L) column for a given row based on values in columns F, I, J, and K."""
-        # Get values from relevant columns, convert to float
-        f_val = self._to_float(self.table.item(row, 5))  # Column F (Sheet 2 J sum)
-        i_val = self._to_float(self.table.item(row, 7))  # Column I (Sheet 3 J sum)
-        j_val = self._to_float(self.table.item(row, 8))  # Column J (Sheet 3 K sum)
-        k_val = self._to_float(self.table.item(row, 9))  # Column K (İhtiyaç)
+        """Belirli bir satır için F, I, J ve K sütunlarındaki değerlere göre 'Durum' (L) sütununu hesaplar ve günceller."""
+        # İlgili sütunlardan değerleri alır, float'a dönüştürür
+        f_val = self._to_float(self.table.item(row, 5))  # Sütun F (Sayfa 2 J değeri)
+        i_val = self._to_float(self.table.item(row, 7))  # Sütun I (Sayfa 3 J değeri)
+        j_val = self._to_float(self.table.item(row, 8))  # Sütun J (Sayfa 3 K değeri)
+        k_val = self._to_float(self.table.item(row, 9))  # Sütun K (İhtiyaç)
 
         # 'Durum' (L) için sonucu hesaplar
         result = f_val + i_val + j_val - k_val
         # Metni biçimlendirir: eğer sonuç negatifse, "#SİPARİŞ VER" ekler
         text = f"{result} #SİPARİŞ VER" if result < 0 else str(result)
 
-        # Get or create the QTableWidgetItem for the L column
+        # L sütunu için QTableWidgetItem'ı alır veya oluşturur
         item = self.table.item(row, 10)
         if item is None:
             item = QTableWidgetItem()
-            # Make L column non-editable as it's a calculated field
+            # L sütununu hesaplanmış bir alan olduğu için düzenlenemez yapar
             item.setFlags(item.flags() ^ Qt.ItemIsEditable)
             self.table.setItem(row, 10, item)
-        item.setText(text)  # Set the calculated text
+        item.setText(text)  # Hesaplanan metni ayarlar
 
     def _update_order_quantities(self, row: int, df4: pd.DataFrame):
         """
-        Calculates and updates 'Verilen Sipariş Miktarı' and 'Verilmesi Gereken Sipariş Miktarı'
-        for a given row based on the 'Durum' column and the 4th Excel sheet.
+        'Durum' sütunu ve 4. Excel sayfasına göre belirli bir satır için 'Verilen Sipariş Miktarı' ve
+        'Verilmesi Gereken Sipariş Miktarı'nı hesaplar ve günceller.
         """
-        durum_item = self.table.item(row, 10)  # 'Durum' column
-        malzeme_item = self.table.item(row, 1)  # 'Malzeme' column
+        durum_item = self.table.item(row, 10)  # 'Durum' sütunu
+        malzeme_item = self.table.item(row, 1)  # 'Malzeme' sütunu
 
         verilen_siparis_miktari = 0.0
         verilmesi_gereken_siparis_miktari = 0.0
-        durum_numeric_val = 0.0  # Initialize to 0.0
+        durum_numeric_val = 0.0  # 0.0 olarak başlat
 
-        # Always try to get verilen_siparis_miktari if malzeme exists
+        # Malzeme mevcutsa her zaman verilen_siparis_miktari'yi almaya çalış
         if malzeme_item:
             malzeme_val = malzeme_item.text()
-            # Find matches in the 4th sheet based on 'Malzeme' (column C, index 2)
+            # 4. sayfada 'Malzeme'ye (C sütunu, indeks 2) göre eşleşmeleri bul
             s4_matches = df4[df4[self.SHEET4_COLS["C"]] == malzeme_val]
 
             if not s4_matches.empty:
-                # Sum values from column 8 (column I) in the 4th sheet
+                # 4. sayfadaki 8. indeks sütunundaki (I sütunu) değerleri topla
                 verilen_siparis_miktari = s4_matches[self.SHEET4_COLS["I"]].apply(self._to_float_series).sum()
 
-        # Calculate verilmesi_gereken_siparis_miktari only if "#SİPARİŞ VER" is present in Durum
+        # Sadece Durum'da "#SİPARİŞ VER" varsa verilmesi_gereken_siparis_miktari'yi hesapla
         if durum_item and "#SİPARİŞ VER" in durum_item.text():
             try:
-                # Extract the numeric part of the 'Durum' value
+                # 'Durum' değerinin sayısal kısmını çıkar
                 durum_numeric_str = durum_item.text().split(" #SİPARİŞ VER")[0].replace(",", ".")
                 durum_numeric_val = float(durum_numeric_str)
             except (ValueError, AttributeError):
-                durum_numeric_val = 0.0  # Still default to 0 if parsing fails
+                durum_numeric_val = 0.0  # Ayrıştırma başarısız olursa yine de 0'a varsayılan
 
-            # 'Verilmesi Gereken Sipariş Miktarı'nı hesaplar
-            # Sum the value in the Durum column with Verilen Sipariş Miktarı
+            # 'Verilmesi Gereken Sipariş Miktarı'nı hesapla
+            # Durum sütunundaki değer ile Verilen Sipariş Miktarı'nı topla
             remaining_needed = durum_numeric_val + verilen_siparis_miktari
 
-            # If the remaining value is negative, take its absolute value; otherwise, write 0
+            # Eğer kalan değer negatifse, mutlak değerini al; aksi takdirde 0 yaz
             if remaining_needed < 0:
                 verilmesi_gereken_siparis_miktari = abs(remaining_needed)
             else:
                 verilmesi_gereken_siparis_miktari = 0.0
 
-        # "Verilen Sipariş Miktarı" (index 11) için öğeleri ayarlar
+        # "Verilen Sipariş Miktarı" (indeks 11) için öğeleri ayarla
         item_verilen = self.table.item(row, 11)
         if item_verilen is None:
             item_verilen = QTableWidgetItem()
-            item_verilen.setFlags(item_verilen.flags() ^ Qt.ItemIsEditable)  # Make non-editable
+            item_verilen.setFlags(item_verilen.flags() ^ Qt.ItemIsEditable)  # Düzenlenemez yap
             self.table.setItem(row, 11, item_verilen)
         item_verilen.setText(str(verilen_siparis_miktari))
 
-        # "Verilmesi Gereken Sipariş Miktarı" (index 12) için öğeleri ayarlar
+        # "Verilmesi Gereken Sipariş Miktarı" (indeks 12) için öğeleri ayarla
         item_gereken = self.table.item(row, 12)
         if item_gereken is None:
             item_gereken = QTableWidgetItem()
-            item_gereken.setFlags(item_gereken.flags() ^ Qt.ItemIsEditable)  # Make non-editable
+            item_gereken.setFlags(item_gereken.flags() ^ Qt.ItemIsEditable)  # Düzenlenemez yap
             self.table.setItem(row, 12, item_gereken)
         item_gereken.setText(str(verilmesi_gereken_siparis_miktari))
 
     def _process_fsnkp_rows(self):
         """
-        Processes rows to remove 'FSNKP' entries and update the 'Durum' column of the previous row.
-        Iterates backwards to handle row removal correctly.
+        'FSNKP' girişlerini kaldırmak ve önceki satırın 'Durum' sütununu güncellemek için satırları işler.
+        Satır silme işlemini doğru şekilde ele almak için geriye doğru yineler.
         """
         self._updating = True
 
         rows_to_remove = []
-        # Iterate backwards to handle row removal correctly
-        for r_idx in range(self.table.rowCount() - 1, 0, -1):  # Start from second to last row, go to row 1
-            # Ensure items exist before accessing text
+        # Satır kaldırma işlemini doğru şekilde ele almak için geriye doğru yinele
+        for r_idx in range(self.table.rowCount() - 1, 0, -1):  # Sondan ikinci satırdan başla, 1. satıra kadar git
+            # Metne erişmeden önce öğelerin mevcut olduğundan emin ol
             current_malzeme_item = self.table.item(r_idx, 1)
             prev_malzeme_item = self.table.item(r_idx - 1, 1)
             current_aciklama_item = self.table.item(r_idx, 2)
@@ -594,28 +611,28 @@ class ExcelProcessorApp(QMainWindow):
             prev_malzeme = prev_malzeme_item.text() if prev_malzeme_item else ""
             current_aciklama = current_aciklama_item.text() if current_aciklama_item else ""
 
-            # Check if current row's 'Malzeme' (column 1) matches previous row's 'Malzeme'
-            # and current row's 'Açıklama' (column 2) contains "FSNKP"
-            # Also ensure that the current row is NOT a header row itself (check if column 1 is "Malzeme")
+            # Mevcut satırın 'Malzeme' (sütun 1) önceki satırın 'Malzeme'siyle eşleşiyor mu kontrol et
+            # ve mevcut satırın 'Açıklama'sı (sütun 2) "FSNKP" içeriyor mu kontrol et
+            # Ayrıca mevcut satırın kendisinin bir başlık satırı OLMADIĞINDAN emin ol (sütun 1'in "Malzeme" olup olmadığını kontrol et)
             if current_malzeme == prev_malzeme and "FSNKP" in current_aciklama and current_malzeme != "Malzeme":
-                # Add "#FSNKP" to the 'Durum' column (column 10) of the previous row
+                # Önceki satırın 'Durum' sütununa (sütun 10) "#FSNKP" ekle
                 prev_durum_item = self.table.item(r_idx - 1, 10)
                 if prev_durum_item:
                     current_durum_text = prev_durum_item.text()
-                    if "#FSNKP" not in current_durum_text:  # Avoid adding duplicate "#FSNKP"
+                    if "#FSNKP" not in current_durum_text:  # Yinelenen "#FSNKP" eklemeyi önle
                         prev_durum_item.setText(current_durum_text + " #FSNKP")
 
-                # Mark the current row for removal
+                # Mevcut satırı kaldırmak için işaretle
                 rows_to_remove.append(r_idx)
 
-        # Remove rows marked for removal (from highest index to lowest to avoid index shifting issues)
+        # Kaldırılacak satırları kaldır (dizin kaydırma sorunlarını önlemek için en yüksek dizinden en düşüğe doğru)
         for r_idx in sorted(rows_to_remove, reverse=True):
             self.table.removeRow(r_idx)
 
-        # After all FSNKP processing and row removals, re-identify highlighted rows
+        # Tüm FSNKP işleme ve satır kaldırma işlemlerinden sonra, vurgulanan satırları yeniden belirle
         self.highlighted_rows = []
         for r_idx in range(self.table.rowCount()):
-            # A row is a block header if its second column (index 1) is "Malzeme"
+            # Bir satır, ikinci sütunu (indeks 1) "Malzeme" ise bir blok başlığıdır
             malzeme_header_item = self.table.item(r_idx, 1)
             if malzeme_header_item and malzeme_header_item.text() == "Malzeme":
                 self.highlighted_rows.append(r_idx)
@@ -624,8 +641,8 @@ class ExcelProcessorApp(QMainWindow):
 
     def _update_completion_chart(self):
         """
-        Counts cells in the 'Durum' column and creates a pie chart showing completion status.
-        Also adds the latest delivery date and Ü.Ağacı Sev value to the chart.
+        'Durum' sütunundaki hücreleri sayar ve tamamlanma durumunu gösteren bir pasta grafiği oluşturur.
+        Ayrıca, en geç teslim tarihini ve Ü.Ağacı Sev değerini grafiğe ekler.
         """
         completed_count = 0
         incomplete_count = 0
@@ -633,7 +650,7 @@ class ExcelProcessorApp(QMainWindow):
         latest_delivery_date = None
         u_agaci_sev_value = ""
 
-        # Find the first non-header row to get the initial Ü.Ağacı Sev value for the chart title
+        # Grafik başlığı için başlangıç Ü.Ağacı Sev değerini almak için ilk başlık olmayan satırı bul
         first_data_row_idx = -1
         for r_idx in range(total_rows):
             if r_idx not in self.highlighted_rows:
@@ -646,107 +663,107 @@ class ExcelProcessorApp(QMainWindow):
                 u_agaci_sev_value = u_agaci_sev_item.text()
 
         for r_idx in range(total_rows):
-            # Skip header rows when calculating completion status
+            # Tamamlanma durumunu hesaplarken başlık satırlarını atla
             if r_idx in self.highlighted_rows:
                 continue
 
-            durum_item = self.table.item(r_idx, 10)  # 'Durum' column (index 10)
+            durum_item = self.table.item(r_idx, 10)  # 'Durum' sütunu (indeks 10)
             if durum_item and "#SİPARİŞ VER" in durum_item.text():
                 incomplete_count += 1
             else:
                 completed_count += 1
 
-            # Find the latest delivery date
-            teslim_tarihi_item = self.table.item(r_idx, 13)  # 'Teslim Tarihi' column (index 13)
+            # En geç teslim tarihini bul
+            teslim_tarihi_item = self.table.item(r_idx, 13)  # 'Teslim Tarihi' sütunu (indeks 13)
             if teslim_tarihi_item:
                 date_str = teslim_tarihi_item.text()
                 try:
-                    # Parse DD.MM.YYYY format
+                    # GG.AA.YYYY formatını ayrıştır
                     current_date = datetime.datetime.strptime(date_str, '%d.%m.%Y').date()
                     if latest_delivery_date is None or current_date > latest_delivery_date:
                         latest_delivery_date = current_date
                 except ValueError:
-                    pass  # Ignore invalid date formats
+                    pass  # Geçersiz tarih formatlarını yoksay
 
-        # Clear existing chart from container
+        # Kapsayıcıdan mevcut grafiği temizle
         for i in reversed(range(self.chart_container.layout().count())):
             widget_to_remove = self.chart_container.layout().itemAt(i).widget()
             if widget_to_remove:
                 widget_to_remove.setParent(None)
 
-        # Calculate total data rows (excluding headers) for percentage calculation
+        # Yüzde hesaplaması için toplam veri satırlarını (başlıklar hariç) hesapla
         total_data_rows = total_rows - len(self.highlighted_rows)
         if total_data_rows == 0:
             no_data_label = QLabel("Grafik için veri yok.", alignment=Qt.AlignCenter)
             self.chart_container.layout().addWidget(no_data_label)
-            self.chart_figure = None  # Clear the figure if no data
+            self.chart_figure = None  # Veri yoksa figürü temizle
             return
 
         completed_percentage = (completed_count / total_data_rows) * 100
         incomplete_percentage = (incomplete_count / total_data_rows) * 100
 
-        # Define a custom autopct function to handle zero percentages gracefully
+        # Sıfır yüzdeleri zarifçe işlemek için özel bir autopct fonksiyonu tanımla
         def autopct_format(pct):
             return ('%1.1f%%' % pct) if pct > 0 else ''
 
-        # Create a Matplotlib figure and axes
-        self.chart_figure = Figure(figsize=(7, 4.6), dpi=100)  # Set figure size for 700x460 pixels
+        # Bir Matplotlib figürü ve eksenleri oluştur
+        self.chart_figure = Figure(figsize=(7, 4.6), dpi=100)  # Figür boyutunu 700x460 piksel olarak ayarla
         ax = self.chart_figure.add_subplot(111)
 
-        # Updated colors: Blue for completed, Orange for incomplete
+        # Güncellenmiş renkler: Tamamlanan için Mavi, Tamamlanmayan için Turuncu
         labels = ['Tamamlandı ({:.1f}%)'.format(completed_percentage),
                   'Tamamlanmadı ({:.1f}%)'.format(incomplete_percentage)]
         sizes = [completed_percentage, incomplete_percentage]
-        colors = ['#1f77b4', '#ff7f0e']  # Blue and Orange
-        explode = (0.05, 0)  # Slightly separate the 'completed' slice
+        colors = ['#1f77b4', '#ff7f0e']  # Mavi ve Turuncu
+        explode = (0.05, 0)  # 'Tamamlandı' dilimini hafifçe ayır
 
         ax.pie(sizes, explode=explode, labels=labels, colors=colors,
                autopct=autopct_format, shadow=True, startangle=90,
-               textprops={'fontsize': 10, 'color': 'black', 'fontweight': 'bold'})  # Text properties for labels
-        ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+               textprops={'fontsize': 10, 'color': 'black', 'fontweight': 'bold'})  # Etiketler için metin özellikleri
+        ax.axis('equal')  # Eşit en boy oranı, pastanın bir daire olarak çizilmesini sağlar.
 
-        # Set chart title with Ü.Ağacı Sev value
+        # Grafik başlığını Ü.Ağacı Sev değeriyle ayarla
         chart_title_text = f"{u_agaci_sev_value} İş Tamamlanma Durumu"
         ax.set_title(chart_title_text, fontsize=16, color='#2c3e50', fontweight='bold')
 
-        # Add latest delivery date to the chart - positioned at bottom-right below title
+        # En geç teslim tarihini grafiğe ekle - başlığın altında sağ alt köşeye konumlandırıldı
         if latest_delivery_date:
             date_text = f"En Geç Teslim Tarihi: {latest_delivery_date.strftime('%d.%m.%Y')}"
-            # Position the date text at the bottom right, relative to the figure, not axes
-            # Adjusted y coordinate to be slightly higher (0.05 instead of 0.02) to ensure no overlap with the very bottom edge.
+            # Tarih metnini figüre göre sağ alt köşeye konumlandır, eksenlere göre değil
+            # Y koordinatı hafifçe yukarı ayarlandı (0.02 yerine 0.05) böylece en alt kenarla çakışma olmaz.
             self.chart_figure.text(0.98, 0.05, date_text, transform=self.chart_figure.transFigure,
                                    fontsize=10, color='#555555', ha='right', va='bottom', fontweight='bold')
 
-        # Adjust layout to prevent labels/title from overlapping
+        # Etiketlerin/başlığın çakışmasını önlemek için düzeni ayarla
         self.chart_figure.tight_layout()
 
-        # Embed the Matplotlib figure into a PyQt widget
-        # Added stretch=1 to ensure the canvas expands within its layout
+        # Matplotlib figürünü bir PyQt widget'ına göm
+        # Tuvalin düzeni içinde genişlemesini sağlamak için stretch=1 eklendi
         canvas = FigureCanvas(self.chart_figure)
         self.chart_container.layout().addWidget(canvas, stretch=1)
         canvas.draw()
 
     def _save_chart_as_image(self):
-        """Saves the generated pie chart as a JPEG/PNG image."""
+        """Oluşturulan pasta grafiğini bir JPEG/PNG görüntüsü olarak kaydeder."""
         if self.chart_figure is None:
             QMessageBox.warning(self, "Uyarı", "Kaydedilecek bir grafik bulunamadı. Lütfen önce tabloyu görüntüleyin.")
             return
 
-        # Get save file path from user
+        # Kullanıcıdan kaydetme dosya yolunu al
         path, _ = QFileDialog.getSaveFileName(self, "Grafiği Kaydet", "iş_tamamlanma_grafiği.png",
                                               "Görüntü Dosyaları (*.png *.jpg *.jpeg)")
         if not path:
             return
 
         try:
-            # Save the figure with specified dimensions
-            self.chart_figure.savefig(path, dpi=100)  # dpi=100 with figsize=(7, 4.6) gives 700x460 pixels
+            # Figürü belirtilen boyutlarla kaydet
+            self.chart_figure.savefig(path, dpi=100)  # dpi=100 ve figsize=(7, 4.6) 700x460 piksel verir
             QMessageBox.information(self, "Başarılı", f"Grafik kaydedildi: {path.split('/')[-1]}")
         except Exception as e:
             QMessageBox.critical(self, "Hata", f"Grafik kaydedilirken bir hata oluştu:\n{e}")
 
     # -------------------------------------------------------------------- #
-    #                           Save to Excel
+    #                           Excel'e Kaydet
     # -------------------------------------------------------------------- #
     def _save_excel(self):
         """Geçerli verileri QTableWidget'tan yeni bir Excel dosyasına kaydeder ve belirginleştirme uygular."""
@@ -765,7 +782,7 @@ class ExcelProcessorApp(QMainWindow):
                 row_data.append(item.text() if item else "")
             data_to_save.append(row_data)
 
-        # Create DataFrame without explicit headers, as headers are now part of the data_to_save
+        # Başlıklar artık data_to_save'in bir parçası olduğu için açık başlıklar olmadan DataFrame oluştur
         df_to_save = pd.DataFrame(data_to_save)
 
         try:
@@ -785,22 +802,22 @@ class ExcelProcessorApp(QMainWindow):
             # Belirginleştirilecek satırlara formatı uygula
             # Excel satırları 1-indeksli olduğu için r_idx + 1 kullanılır.
             for r_idx in self.highlighted_rows:
-                # set_row takes 0-indexed row number for xlsxwriter
-                # Apply the header font format to the header rows
+                # set_row, xlsxwriter için 0-indeksli satır numarasını alır
+                # Başlık satırlarına başlık yazı tipi formatını uygula
                 worksheet.set_row(r_idx, None, header_font_format)
 
-            # Apply general highlight format to other highlighted rows (if any, though in this logic it's only headers)
-            # This loop is technically redundant if highlighted_rows only contains header rows
-            # But kept for robustness if logic changes later.
+            # Diğer vurgulanan satırlara genel vurgulama formatını uygula (varsa, ancak bu mantıkta sadece başlıklar)
+            # Bu döngü, highlighted_rows yalnızca başlık satırlarını içeriyorsa teknik olarak gereksizdir
+            # Ancak mantık daha sonra değişirse sağlamlık için tutuldu.
             for r_idx in self.highlighted_rows:
-                if r_idx not in self.highlighted_rows:  # This condition will always be false
+                if r_idx not in self.highlighted_rows:  # Bu koşul her zaman yanlış olacaktır
                     worksheet.set_row(r_idx, None, highlight_format)
 
             writer.close()
             QMessageBox.information(self, "Başarılı", f"Dosya kaydedildi: {path.split('/')[-1]}")
         except Exception as e:
             QMessageBox.critical(self, "Hata",
-                                 f"Dosya kaydedilirken ve belirginleştirme uygulanırken bir hata oluştu:\n{e}")
+                                 f"Dosya kaydedilirken ve belirginleştirme uygulanırken bir hata oluştu:\\n{e}")
 
 
 # ----------------------------------------------------------------------- #
