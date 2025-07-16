@@ -280,14 +280,6 @@ class ExcelProcessorApp(QMainWindow):
         df3 = self.excel_data["s3"]
         df4 = self.excel_data["s4"]
 
-        # Tüm kit kodlarını (A sütunundaki blok başlıkları) toplamak için bir küme oluştur
-        all_kit_codes = set()
-        for _, row_df1 in df1.iterrows():
-            raw_val = str(row_df1[self.SHEET1_COLS["A"]])
-            # Bir değerin kit kodu olup olmadığını kontrol et (tire içeriyor mu ve harf içeriyor mu?)
-            if "-" in raw_val and any(char.isalpha() for char in raw_val):
-                all_kit_codes.add(raw_val)
-
         # Dinamik tablo içeriği için hazırla
         final_table_content = []
         self.highlighted_rows = []  # Mevcut doldurma için vurgulanan satırları sıfırla
@@ -330,9 +322,9 @@ class ExcelProcessorApp(QMainWindow):
                 skip_next_data_row_after_header = False  # Bir sonraki yineleme için bayrağı sıfırla
                 continue  # Bu satırı atla
 
-            # Yeni kural: B sütunundaki değer (Malzeme kodu) herhangi bir kit koduyla aynıysa satırı kaldır.
+            # Kural: B sütunundaki değer (Malzeme kodu) A sütunundaki blok koduyla aynıysa satırı kaldır.
             malzeme_val_from_sheet1 = str(row[self.SHEET1_COLS["C"]])
-            if malzeme_val_from_sheet1 in all_kit_codes:  # Değiştirilen koşul
+            if malzeme_val_from_sheet1 == active_kit_code_for_block:
                 continue  # Bu satırı atla, final_table_content'a ekleme
 
             # Buraya ulaşırsak, satır nihai tablo içeriğine eklenmelidir
@@ -712,7 +704,7 @@ class ExcelProcessorApp(QMainWindow):
         ax.axis('equal')  # Eşit en boy oranı, pastanın bir daire olarak çizilmesini sağlar.
 
         # Grafik başlığını Ü.Ağacı Sev değeriyle ayarla
-        chart_title_text = f"eİş Tamamlanma Durumu"
+        chart_title_text = f"{u_agaci_sev_value} İş Tamamlanma Durumu"
         ax.set_title(chart_title_text, fontsize=16, color='#2c3e50', fontweight='bold')
 
         # En geç teslim tarihini grafiğe ekle - başlığın altında sağ alt köşeye konumlandırıldı
