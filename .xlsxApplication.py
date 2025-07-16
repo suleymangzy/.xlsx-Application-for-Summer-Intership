@@ -274,16 +274,11 @@ class ExcelProcessorApp(QMainWindow):
 
     def _populate_table(self):
         """Yüklenen Excel sayfalarındaki verileri QTableWidget'a doldurur,
-        filtreleme, tekilleştirme ve toplama işlemleri yapar, dinamik blok başlıkları da dahil."""
+        tüm verileri herhangi bir koşul gözetmeksizin dahil eder, dinamik blok başlıkları da dahil."""
         df1 = self.excel_data["s1"]
         df2 = self.excel_data["s2"]
         df3 = self.excel_data["s3"]
         df4 = self.excel_data["s4"]
-
-        # Kullanıcının isteği üzerine df1'deki tüm filtreleme ve tekilleştirme kaldırıldı.
-        # df1 = df1[df1[self.SHEET1_COLS["C"]].notna() & df1[self.SHEET1_COLS["A"]].notna()].copy()
-        # df1.drop_duplicates(subset=self.SHEET1_COLS["C"], keep="first", inplace=True)
-        # df1 = df1[df1[self.SHEET1_COLS["C"]].astype(str).str.count('-') < 3].copy()
 
         # Dinamik tablo içeriği için hazırla
         final_table_content = []
@@ -291,8 +286,6 @@ class ExcelProcessorApp(QMainWindow):
 
         # Mevcut blok için "####-####-####" kit kodunu tutar
         active_kit_code_for_block = None
-        # Son blok başlığından bu yana işlenen veri satırı sayısını takip eder
-        data_rows_in_current_block = 0
 
         highlight_color_brush = QBrush(QColor("#FFCCCC"))  # Vurgulama için açık kırmızı
 
@@ -300,11 +293,9 @@ class ExcelProcessorApp(QMainWindow):
         # İlk öğe "Ü.Ağacı Sev" değeri olacak, ardından diğer başlıklar gelecek.
         internal_column_headers = self.HEADER_LABELS[1:]  # "Ü.Ağacı Sev" hariç tüm başlıklar
 
-        # Filtrelenmiş Sayfa 1'in satırları üzerinde yinele
+        # Sayfa 1'in tüm satırları üzerinde yinele
         for r_original_idx, row in enumerate(df1.itertuples(index=False)):
             # Sayfa 1'in 'A' sütunundaki ham değeri al.
-            # Bu sütun, kaynak sayfada bir bloğun yalnızca ilk satırı için kit kodunu içerir,
-            # ardından o bloktaki sonraki satırlar için sayılar (0, 1, 2...) içerir.
             raw_val_from_sheet1_A = str(row[self.SHEET1_COLS["A"]])
 
             # Bu ham değerin bir kit kodu olup olmadığını kontrol et (tire içeriyor mu ve harf içeriyor mu?)
@@ -330,57 +321,48 @@ class ExcelProcessorApp(QMainWindow):
                 block_header_row_content = [active_kit_code_for_block] + internal_column_headers
                 final_table_content.append(block_header_row_content)
                 self.highlighted_rows.append(len(final_table_content) - 1)  # Bunu bir başlık satırı olarak işaretle
-                data_rows_in_current_block = 0  # Yeni blok için sayacı sıfırla
 
-            # Gerçek veri satırını işle
-            # Sadece bloktaki 1. (indeks 0), 4. (indeks 3), 5. (indeks 4) vb. veri satırı ise ekle
-            # (yani 2. veya 3. veri satırları değil, bunlar indeks 1 ve 2'dir)
-            if data_rows_in_current_block == 0 or data_rows_in_current_block >= 3:
-                current_data_row = [""] * len(self.HEADER_LABELS)  # Boş dizelerle başlat
+            # Her zaman gerçek veri satırını işle (2. ve 3. satır atlama mantığı kaldırıldı)
+            current_data_row = [""] * len(self.HEADER_LABELS)  # Boş dizelerle başlat
 
-                # Sayfa 1 sütunlarını doldur
-                # Mevcut bloktaki tüm veri satırları için A sütunu için her zaman active_kit_code_for_block'u kullan
-                current_data_row[0] = active_kit_code_for_block
-                current_data_row[1] = str(row[self.SHEET1_COLS["C"]])  # Malzeme
-                current_data_row[2] = str(row[self.SHEET1_COLS["G"]])  # Açıklama
-                current_data_row[3] = str(row[self.SHEET1_COLS["E"]])  # Miktar
+            # Sayfa 1 sütunlarını doldur
+            # Mevcut bloktaki tüm veri satırları için A sütunu için her zaman active_kit_code_for_block'u kullan
+            current_data_row[0] = active_kit_code_for_block
+            current_data_row[1] = str(row[self.SHEET1_COLS["C"]])  # Malzeme
+            current_data_row[2] = str(row[self.SHEET1_COLS["G"]])  # Açıklama
+            current_data_row[3] = str(row[self.SHEET1_COLS["E"]])  # Miktar
 
-                match_val = row[self.SHEET1_COLS["C"]]  # Sayfa 1 C sütunundaki eşleşme değeri
+            match_val = row[self.SHEET1_COLS["C"]]  # Sayfa 1 C sütunundaki eşleşme değeri
 
-                # Sayfa 2 eşleşmesi ve toplama (kaldırıldı, ilk eşleşen değer alınıyor)
-                s2_matches = df2[df2[self.COMMON_MATCH_COL["G"]] == match_val]
-                if not s2_matches.empty:
-                    current_data_row[4] = str(s2_matches.iloc[0][self.SHEET2_COLS["B"]])  # Depo 100
-                    # Toplama kaldırıldı, ilk eşleşen satırdan değer alınıyor
-                    val_j_s2 = self._to_float_series(s2_matches.iloc[0][self.SHEET2_COLS["J"]])
-                    current_data_row[5] = str(val_j_s2)  # Kullanılabilir Stok (Depo 100)
+            # Sayfa 2 eşleşmesi ve değer ataması (toplama kaldırıldı)
+            s2_matches = df2[df2[self.COMMON_MATCH_COL["G"]] == match_val]
+            if not s2_matches.empty:
+                current_data_row[4] = str(s2_matches.iloc[0][self.SHEET2_COLS["B"]])  # Depo 100
+                val_j_s2 = self._to_float_series(s2_matches.iloc[0][self.SHEET2_COLS["J"]])
+                current_data_row[5] = str(val_j_s2)  # Kullanılabilir Stok (Depo 100)
 
-                # Sayfa 3 eşleşmesi ve toplama (kaldırıldı, ilk eşleşen değer alınıyor)
-                s3_matches = df3[df3[self.COMMON_MATCH_COL["G"]] == match_val]
-                if not s3_matches.empty:
-                    current_data_row[6] = str(s3_matches.iloc[0][self.SHEET3_COLS["B"]])  # Depo 110
-                    # Toplama kaldırıldı, ilk eşleşen satırdan değer alınıyor
-                    val_j_s3 = self._to_float_series(s3_matches.iloc[0][self.SHEET3_COLS["J"]])
-                    current_data_row[7] = str(val_j_s3)  # Kullanılabilir Stok (Depo 110)
-                    # Toplama kaldırıldı, ilk eşleşen satırdan değer alınıyor
-                    val_k_s3 = self._to_float_series(s3_matches.iloc[0][self.SHEET3_COLS["K"]])
-                    current_data_row[8] = str(val_k_s3)  # Kalite Stoğu
+            # Sayfa 3 eşleşmesi ve değer ataması (toplama kaldırıldı)
+            s3_matches = df3[df3[self.COMMON_MATCH_COL["G"]] == match_val]
+            if not s3_matches.empty:
+                current_data_row[6] = str(s3_matches.iloc[0][self.SHEET3_COLS["B"]])  # Depo 110
+                val_j_s3 = self._to_float_series(s3_matches.iloc[0][self.SHEET3_COLS["J"]])
+                current_data_row[7] = str(val_j_s3)  # Kullanılabilir Stok (Depo 110)
+                val_k_s3 = self._to_float_series(s3_matches.iloc[0][self.SHEET3_COLS["K"]])
+                current_data_row[8] = str(val_k_s3)  # Kalite Stoğu
 
-                # K (İhtiyaç) sütunu (tablo indeks 9) başlangıçta boş - hücre değiştiğinde güncellenecek
-                current_data_row[9] = ""
+            # K (İhtiyaç) sütunu (tablo indeks 9) başlangıçta boş - hücre değiştiğinde güncellenecek
+            current_data_row[9] = ""
 
-                # L (Durum) sütunu (tablo indeks 10) başlangıç hesaplaması (K 0 kabul edildi)
-                # Bu, tüm değerlerin mevcut olduğundan emin olmak için tablo doldurulduktan sonra hesaplanacak
-                current_data_row[10] = ""
+            # L (Durum) sütunu (tablo indeks 10) başlangıç hesaplaması (K 0 kabul edildi)
+            # Bu, tüm değerlerin mevcut olduğundan emin olmak için tablo doldurulduktan sonra hesaplanacak
+            current_data_row[10] = ""
 
-                # Sipariş miktarları ve teslim tarihi - tablo doldurulduktan sonra güncellenecek
-                current_data_row[11] = ""  # Verilen Sipariş Miktarı
-                current_data_row[12] = ""  # Verilmesi Gereken Sipariş Miktarı
-                current_data_row[13] = ""  # Teslim Tarihi
+            # Sipariş miktarları ve teslim tarihi - tablo doldurulduktan sonra güncellenecek
+            current_data_row[11] = ""  # Verilen Sipariş Miktarı
+            current_data_row[12] = ""  # Verilmesi Gereken Sipariş Miktarı
+            current_data_row[13] = ""  # Teslim Tarihi
 
-                final_table_content.append(current_data_row)
-
-            data_rows_in_current_block += 1  # Her orijinal df1 veri satırı için bunu her zaman artır
+            final_table_content.append(current_data_row)
 
         # Tablo boyutlarını ayarla
         self.table.setColumnCount(
