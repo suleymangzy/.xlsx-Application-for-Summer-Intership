@@ -280,12 +280,22 @@ class ExcelProcessorApp(QMainWindow):
         df3 = self.excel_data["s3"]
         df4 = self.excel_data["s4"]
 
+        # Tüm kit kodlarını (A sütunundaki blok başlıkları) toplamak için bir küme oluştur
+        all_kit_codes = set()
+        for _, row_df1 in df1.iterrows():
+            raw_val = str(row_df1[self.SHEET1_COLS["A"]])
+            # Bir değerin kit kodu olup olmadığını kontrol et (tire içeriyor mu ve harf içeriyor mu?)
+            if "-" in raw_val and any(char.isalpha() for char in raw_val):
+                all_kit_codes.add(raw_val)
+
         # Dinamik tablo içeriği için hazırla
         final_table_content = []
         self.highlighted_rows = []  # Mevcut doldurma için vurgulanan satırları sıfırla
 
         # Mevcut blok için "####-####-####" kit kodunu tutar
         active_kit_code_for_block = None
+        # Başlık satırından sonraki ilk veri satırını atlamak için bayrak
+        skip_next_data_row_after_header = False
 
         highlight_color_brush = QBrush(QColor("#FFCCCC"))  # Vurgulama için açık kırmızı
 
@@ -301,10 +311,6 @@ class ExcelProcessorApp(QMainWindow):
             # Bu ham değerin bir kit kodu olup olmadığını kontrol et (tire içeriyor mu ve harf içeriyor mu?)
             is_kit_code = "-" in raw_val_from_sheet1_A and any(char.isalpha() for char in raw_val_from_sheet1_A)
 
-            # Yeni bir blok başlığı eklememiz gerekip gerekmediğini belirle.
-            # Yeni bir blok şu durumlarda başlar:
-            # 1. Tüm DataFrame'in ilk satırıysa.
-            # 2. Sayfa 1'in 'A' sütunundaki değer geçerli bir kit koduysa VE şu anda aktif olan kit kodundan farklıysa.
             add_new_block_header = False
             if r_original_idx == 0:
                 add_new_block_header = True
@@ -313,22 +319,29 @@ class ExcelProcessorApp(QMainWindow):
                 add_new_block_header = True
 
             if add_new_block_header:
-                active_kit_code_for_block = raw_val_from_sheet1_A  # Bu yeni blok için aktif kit kodunu güncelle
-
-                # Blok başlık satırını ekle
-                # İlk hücre (A sütunu) 'Ü.Ağacı Sev' değeri (kit kodu) olacak
-                # Diğer hücreler standart HEADER_LABELS (ilki hariç) olacak
+                active_kit_code_for_block = raw_val_from_sheet1_A
                 block_header_row_content = [active_kit_code_for_block] + internal_column_headers
                 final_table_content.append(block_header_row_content)
-                self.highlighted_rows.append(len(final_table_content) - 1)  # Bunu bir başlık satırı olarak işaretle
+                self.highlighted_rows.append(len(final_table_content) - 1)
+                skip_next_data_row_after_header = True  # Bir sonraki veri satırını atlamak için işaretle
 
-            # Her zaman gerçek veri satırını işle (2. ve 3. satır atlama mantığı kaldırıldı)
-            current_data_row = [""] * len(self.HEADER_LABELS)  # Boş dizelerle başlat
+            # Bu satırın bir başlığın hemen altında olduğu için atlanıp atlanmayacağını kontrol et
+            if skip_next_data_row_after_header:
+                skip_next_data_row_after_header = False  # Bir sonraki yineleme için bayrağı sıfırla
+                continue  # Bu satırı atla
 
-            # Sayfa 1 sütunlarını doldur
-            # Mevcut bloktaki tüm veri satırları için A sütunu için her zaman active_kit_code_for_block'u kullan
-            current_data_row[0] = active_kit_code_for_block
-            current_data_row[1] = str(row[self.SHEET1_COLS["C"]])  # Malzeme
+            # Yeni kural: B sütunundaki değer (Malzeme kodu) herhangi bir kit koduyla aynıysa satırı kaldır.
+            malzeme_val_from_sheet1 = str(row[self.SHEET1_COLS["C"]])
+            if malzeme_val_from_sheet1 in all_kit_codes:  # Değiştirilen koşul
+                continue  # Bu satırı atla, final_table_content'a ekleme
+
+            # Buraya ulaşırsak, satır nihai tablo içeriğine eklenmelidir
+            current_data_row = [""] * len(self.HEADER_LABELS)
+
+            # A sütununa yüklenen excel dosyasında 1. sayfadaki 0. indeksli sütundaki değeri yaz
+            current_data_row[0] = str(row[self.SHEET1_COLS["A"]])
+
+            current_data_row[1] = malzeme_val_from_sheet1  # Malzeme
             current_data_row[2] = str(row[self.SHEET1_COLS["G"]])  # Açıklama
             current_data_row[3] = str(row[self.SHEET1_COLS["E"]])  # Miktar
 
@@ -350,17 +363,11 @@ class ExcelProcessorApp(QMainWindow):
                 val_k_s3 = self._to_float_series(s3_matches.iloc[0][self.SHEET3_COLS["K"]])
                 current_data_row[8] = str(val_k_s3)  # Kalite Stoğu
 
-            # K (İhtiyaç) sütunu (tablo indeks 9) başlangıçta boş - hücre değiştiğinde güncellenecek
             current_data_row[9] = ""
-
-            # L (Durum) sütunu (tablo indeks 10) başlangıç hesaplaması (K 0 kabul edildi)
-            # Bu, tüm değerlerin mevcut olduğundan emin olmak için tablo doldurulduktan sonra hesaplanacak
             current_data_row[10] = ""
-
-            # Sipariş miktarları ve teslim tarihi - tablo doldurulduktan sonra güncellenecek
-            current_data_row[11] = ""  # Verilen Sipariş Miktarı
-            current_data_row[12] = ""  # Verilmesi Gereken Sipariş Miktarı
-            current_data_row[13] = ""  # Teslim Tarihi
+            current_data_row[11] = ""
+            current_data_row[12] = ""
+            current_data_row[13] = ""
 
             final_table_content.append(current_data_row)
 
