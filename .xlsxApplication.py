@@ -41,7 +41,7 @@ class ExcelProcessorApp(QMainWindow):
     # Column mappings for original sheets (0-indexed)
     SHEET1_COLS = {"A": 0, "C": 2, "G": 6, "E": 4}
     SHEET2_COLS = {"B": 1, "J": 9}  # J is the column to be summed
-    SHEET3_COLS = {"B": 1, "J": 9, "K": 10}  # J and K are the columns to be summed
+    SHEET3_COLS = {"B": 1, "J": 9, "K": 10, "L": 11}  # J, K and L are the columns to be summed
     COMMON_MATCH_COL = {"G": 6}  # Column G (index 6) is used for matching across sheets
     # New: Column mappings for the 4th sheet
     # Assuming 2nd index (column C) for matching material, 8th index (column I) for ordered quantity
@@ -202,7 +202,7 @@ class ExcelProcessorApp(QMainWindow):
         chart_layout.setAlignment(Qt.AlignCenter)  # Grafik içeriğini kapsayıcısında ortala
         chart_v_layout.addWidget(self.chart_container)
 
-        chart_hbox = QHBoxLayout()
+        chart_hbox = QHBoxLayout()  # Grafik sayfası butonları için yeni düzen
         self.btn_chart_back = QPushButton("Geri Dön",
                                           clicked=lambda: self.stacked_widget.setCurrentWidget(self.table_page))
         self.btn_save_chart = QPushButton("Grafiği Kaydet", clicked=self._save_chart_as_image)
@@ -346,12 +346,12 @@ class ExcelProcessorApp(QMainWindow):
             s3_matches = df3[df3[self.COMMON_MATCH_COL["G"]] == match_val]
             if not s3_matches.empty:
                 current_data_row[6] = str(s3_matches.iloc[0][self.SHEET3_COLS["B"]])  # Depo 110
-                # Toplamı al
-                val_j_s3_sum = s3_matches[self.SHEET3_COLS["J"]].apply(self._to_float_series).sum()
-                current_data_row[7] = str(val_j_s3_sum)  # Kullanılabilir Stok (Depo 110)
-                # Toplamı al
+                # Toplamı al: Sayfa 3 K sütunundaki değerler Kullanılabilir Stok (Depo 110) sütununa
                 val_k_s3_sum = s3_matches[self.SHEET3_COLS["K"]].apply(self._to_float_series).sum()
-                current_data_row[8] = str(val_k_s3_sum)  # Kalite Stoğu
+                current_data_row[7] = str(val_k_s3_sum)  # Kullanılabilir Stok (Depo 110)
+                # Toplamı al: Sayfa 3 L sütunundaki değerler Kalite Stoğu sütununa
+                val_l_s3_sum = s3_matches[self.SHEET3_COLS["L"]].apply(self._to_float_series).sum()
+                current_data_row[8] = str(val_l_s3_sum)  # Kalite Stoğu
 
             current_data_row[9] = ""
             current_data_row[10] = ""
@@ -561,7 +561,7 @@ class ExcelProcessorApp(QMainWindow):
             item_verilen = QTableWidgetItem()
             item_verilen.setFlags(item_verilen.flags() ^ Qt.ItemIsEditable)  # Düzenlenemez yap
             self.table.setItem(row, 11, item_verilen)
-        item_verilen.setText(str(verilen_siparis_miktari))
+        item_verilen.setText(str(verilmesi_gereken_siparis_miktari))
 
         # "Verilmesi Gereken Sipariş Miktarı" (indeks 12) için öğeleri ayarla
         item_gereken = self.table.item(row, 12)
