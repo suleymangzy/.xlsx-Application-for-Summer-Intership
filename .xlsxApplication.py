@@ -522,52 +522,60 @@ class ExcelProcessorApp(QMainWindow):
         durum_item = self.table.item(row, 10)  # 'Durum' sütunu
         malzeme_item = self.table.item(row, 1)  # 'Malzeme' sütunu
 
+        # Initialize to 0.0
         verilen_siparis_miktari = 0.0
         verilmesi_gereken_siparis_miktari = 0.0
-        durum_numeric_val = 0.0  # 0.0 olarak başlat
+        durum_numeric_val = 0.0
 
-        # Malzeme mevcutsa her zaman verilen_siparis_miktari'yi almaya çalış
+        # Calculate "Verilen Sipariş Miktarı" based on sheet 4, column I (index 8)
         if malzeme_item:
             malzeme_val = malzeme_item.text()
-            # 4. sayfada 'Malzeme'ye (C sütunu, indeks 2) göre eşleşmeleri bul
+            # Match current row's 'Malzeme' (column 1) with SHEET4_COLS["C"] (index 2)
+            # and sum SHEET4_COLS["I"] (index 8)
             s4_matches = df4[df4[self.SHEET4_COLS["C"]] == malzeme_val]
-
             if not s4_matches.empty:
-                # 4. sayfadaki 8. indeks sütunundaki (I sütunu) değerleri topla
+                # Sum the values in the 'I' column (index 8) from sheet 4
                 verilen_siparis_miktari = s4_matches[self.SHEET4_COLS["I"]].apply(self._to_float_series).sum()
 
-        # Sadece Durum'da "#SİPARİŞ VER" varsa verilmesi_gereken_siparis_miktari'yi hesapla
+        # Extract numeric value from 'Durum' column
         if durum_item and "#SİPARİŞ VER" in durum_item.text():
             try:
-                # 'Durum' değerinin sayısal kısmını çıkar
+                # Extract the numeric part of the 'Durum' value
                 durum_numeric_str = durum_item.text().split(" #SİPARİŞ VER")[0].replace(",", ".")
                 durum_numeric_val = float(durum_numeric_str)
             except (ValueError, AttributeError):
-                durum_numeric_val = 0.0  # Ayrıştırma başarısız olursa yine de 0'a varsayılan
+                durum_numeric_val = 0.0
 
-            # 'Verilmesi Gereken Sipariş Miktarı'nı hesapla
-            # Durum sütunundaki değer ile Verilen Sipariş Miktarı'nı topla
-            remaining_needed = durum_numeric_val + verilen_siparis_miktari
-
-            # Eğer kalan değer negatifse, mutlak değerini al; aksi takdirde 0 yaz
-            if remaining_needed < 0:
-                verilmesi_gereken_siparis_miktari = abs(remaining_needed)
+        # Calculate "Verilmesi Gereken Sipariş Miktarı"
+        # It should be (Value from 'Durum' column) - (Value from 'Verilen Sipariş Miktarı' column)
+        # Taking into account that durum_numeric_val is already (F+I+J-K) from _update_l_column
+        # And if it has #SİPARİŞ VER, it means it's negative.
+        # So, the "remaining_needed" is the absolute value of durum_numeric_val, minus verilen_siparis_miktari
+        # If durum_numeric_val is -100 and verilen_siparis_miktari is 20, then remaining needed is 100 - 20 = 80
+        # If durum_numeric_val is -100 and verilen_siparis_miktari is 120, then remaining needed is 0 (already fulfilled and more)
+        if durum_numeric_val < 0:  # Only if '#SİPARİŞ VER' is present, meaning it's a negative stock
+            # The absolute need is -durum_numeric_val
+            net_need = abs(durum_numeric_val) - verilen_siparis_miktari
+            if net_need > 0:
+                verilmesi_gereken_siparis_miktari = net_need
             else:
                 verilmesi_gereken_siparis_miktari = 0.0
+        else:  # If Durum is not negative (no #SİPARİŞ VER), then no order is needed
+            verilmesi_gereken_siparis_miktari = 0.0
 
-        # "Verilen Sipariş Miktarı" (indeks 11) için öğeleri ayarla
+        # Set items for "Verilen Sipariş Miktarı" (index 11)
         item_verilen = self.table.item(row, 11)
         if item_verilen is None:
             item_verilen = QTableWidgetItem()
-            item_verilen.setFlags(item_verilen.flags() ^ Qt.ItemIsEditable)  # Düzenlenemez yap
+            item_verilen.setFlags(item_verilen.flags() ^ Qt.ItemIsEditable)  # Make uneditable
             self.table.setItem(row, 11, item_verilen)
-        item_verilen.setText(str(verilmesi_gereken_siparis_miktari))
+        item_verilen.setText(str(verilen_siparis_miktari))
 
-        # "Verilmesi Gereken Sipariş Miktarı" (indeks 12) için öğeleri ayarla
+        # Set items for "Verilmesi Gereken Sipariş Miktarı" (index 12)
         item_gereken = self.table.item(row, 12)
         if item_gereken is None:
             item_gereken = QTableWidgetItem()
-            item_gereken.setFlags(item_gereken.flags() ^ Qt.ItemIsEditable)  # Düzenlenemez yap
+            item_gereken.setFlags(item_gereken.flags() ^ Qt.ItemIsEditable)  # Make uneditable
             self.table.setItem(row, 12, item_gereken)
         item_gereken.setText(str(verilmesi_gereken_siparis_miktari))
 
